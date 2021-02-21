@@ -20,27 +20,37 @@ Your identity is an RSA public key, which is derived from a RSA private key. Whe
 From my experience the js-ipfs library is not able to push our IPNS published records in a way that other IPFS nodes on the internet are able to resolve the names. In order for the server to publish an IPNS name on your behalf using your own peerId you are required to send the private key to the server. This is incredibly insecure. An alternative is to disable sending the private key and to delgate IPNS publishing to a server peerID which can publish a list of all the profile tip information. This delegated IPNS functionality is experimental and offers limited ability to obtain profile data as, at present, only the server maintaining the delegated list will be able to find the profile data in IPFS  
   
 ### Notes on Anonymity   
-Your anonymity is up to you. I have made no effort to put services behind Tor or I2P or whatever. I have made no effort to encrypt any of the text produced by this code to be stored in IPFS. If your government is made up of terrorists then you will need to take your own steps to shroud your communication to any running instance of this server. Technically the only identifying information that a server requires to process your request is a whitelisted public RSA key. I would think that accessing this service via a TOR exit should sufficiently obfuscate your traffic origin.  
+Your anonymity is up to you. I have made no effort to put services behind Tor or I2P or whatever. I have made no effort to encrypt any of the text produced by this code to be stored in IPFS. If your government is made up of terrorists then you will need to take your own steps to shroud your communication to any running instance of this server. Technically the only identifying information that a server requires to process your request is a whitelisted public RSA key. I would think that accessing this service via a Tor exit should sufficiently obfuscate your traffic origin.  
   
 ### Proof of Concept  
   
 This is an experimental proof of concept, to verify if the idea works and if IPFS delivers on its promises. Major concerns at present are the need to send private key to the server to do IPNS properly. Perhaps there are better solutions via pubsub or other techniques to share profileTip cid information around.  
   
   
-### Build / run  
-Below are using example paths for the project and go resource directories. you will have to fix according to your system  
+### Build / run 
+Prequisites: Golang 1.15.6 or compatible, Docker or existing IPFS node.
+
+Below are using example paths for the project and go resource directories. You will need to fix according to your system. Below we will start an IPFS node which will listen for API on port 7767, get dependencies for the golang project, build the ciddag binary from source using golang 1.15.6 and then run it set to provide a ui via http on port 4589, and to communicate with the running IPFS node on its port 7767   
+
+Start IPFS node:
+    
+    
+    cd /home/blademccool/ciddag/;
+    COMPOSE_FILE=docker-compose.base.yml docker-compose up -d ipfs0
 
 Build:
  
 
     cd /home/blademccool/ciddag/src;
+    GOROOT=/home/blademccool/sdk/go1.15.6 GOPATH=/home/blademccool/go /home/blademccool/sdk/go1.15.6/bin/go get -u ./...;
     GOROOT=/home/blademccool/sdk/go1.15.6 GOPATH=/home/blademccool/go /home/blademccool/sdk/go1.15.6/bin/go build -i -o ciddag .  
 
- Run: 
+Run: 
  
 
-    CIDDAG_HTTP_PORT=4589 CIDDAG_IPFS_API_SERVER=localhost:7867 CIDDAG_IPFS_KEYSTORE_PATH=./compose/ipfs2/keystore CIDDAG_WL_PROFILEIDS="QmQPy3enk6rHvumMT1u2bnNCEr4QoBiqU2EHXaRUVxmw5p,Qmd7Scc5K1B8JLNoMS4cKATQKemAoSaEq7nFc5b3oQ9F3M" ./ciddag 
+    CIDDAG_HTTP_PORT=4589 CIDDAG_IPFS_API_SERVER=localhost:7767 CIDDAG_IPFS_KEYSTORE_PATH=./compose/ipfs2/keystore CIDDAG_WL_PROFILEIDS="QmQPy3enk6rHvumMT1u2bnNCEr4QoBiqU2EHXaRUVxmw5p,Qmd7Scc5K1B8JLNoMS4cKATQKemAoSaEq7nFc5b3oQ9F3M" ./ciddag 
 
+ 
  
 ### TODOs / ideas for the future   
  - Improve UI, ux, layout/design etc as well as the possibility to make use of the js-ipfs library to load cid data and move timeline assembly code from the server to the browser, which could make the experience much more dynamic!  
