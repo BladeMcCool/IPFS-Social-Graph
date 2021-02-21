@@ -1,0 +1,28 @@
+version: '3.4'
+
+x-variables: &environment
+  var1: 'pork barrel'
+
+services:
+  ipfs0:
+    container_name: ipfs0
+    image: ipfs/go-ipfs:release
+    ports:
+     - "7766:4001" # ipfs swarm - expose if needed/wanted
+     - "7767:5001" # ipfs api - expose if needed/wanted
+     - "7768:8080" # ipfs gateway - expose if needed/wanted
+    volumes:
+      - ./compose/ipfs0:/data/ipfs
+      - ./ipfs_add_files:/export
+      
+  ipfs2:
+    container_name: ipfs2
+    image: ipfs/go-ipfs:release
+    ports:
+     - "7866:4001" # ipfs swarm - expose if needed/wanted
+     - "7867:5001" # ipfs api - expose if needed/wanted
+     - "7868:8080" # ipfs gateway - expose if needed/wanted
+    volumes:
+      - ./compose/ipfs2:/data/ipfs
+      - ./ipfs2_add_files:/export
+      
