@@ -266,22 +266,36 @@
       target.textContent = "" //apparently not the worst way to make all the existing child elements go away before we render the updated history.
       for (var i = 0; i < texts.length; i++) {
         console.log("adding this", texts[i])
-          var ptag = document.createElement("p");
-          // var textnode = document.createTextNode(texts[i]);
-          node = texts[i]
-          text = node["Date"] + " " + "\u00A0".repeat(node["Indent"] * 8) + " " + node["DisplayName"] + ": " + node["PreviewText"] + "  "
-          var textnode = document.createTextNode(text);
-          ptag.appendChild(textnode);
-          var atag = document.createElement("a");
-          atag.href = "#"
-          atag.onclick = function(cid){ return function(){
-            document.getElementById("inreplyto").value = cid
-            focusPostText()
-            return false;
-          }}(node["Cid"])
-          atag.appendChild(document.createTextNode("[Reply]"))
-          ptag.appendChild(atag)
-          target.appendChild(ptag);
+        node = texts[i]
+        var ptag = document.createElement("p");
+        ptag.title = "ProfileId: " + node["ProfileId"] + "\nGraphNode cid: " + node["Cid"] + "\nGraphNode previous: " + node["previous"]
+        if (node["post"] != undefined) {
+          if (node["post"]["Reply"] != undefined) {
+            for (var j = 0; j < node["post"]["Reply"].length; j++) {
+              ptag.title += "\nReply to GraphNode cid: " + node["post"]["Reply"][j]
+            }
+          }
+          ptag.title += "\nPost Content Cid: " + node["post"]["Cid"]
+        }
+        if (node["publicfollow"] != undefined) {
+          for (var j = 0; j < node["publicfollow"].length; j++) {
+            ptag.title += "\nFollow of ProfileId: " + node["publicfollow"][j]
+          }
+        }
+        // var textnode = document.createTextNode(texts[i]);
+        text = node["Date"] + " " + "\u00A0".repeat(node["Indent"] * 8) + " " + node["DisplayName"] + ": " + node["PreviewText"] + "  "
+        var textnode = document.createTextNode(text);
+        ptag.appendChild(textnode);
+        var atag = document.createElement("a");
+        atag.href = "#"
+        atag.onclick = function(cid){ return function(){
+          document.getElementById("inreplyto").value = cid
+          focusPostText()
+          return false;
+        }}(node["Cid"])
+        atag.appendChild(document.createTextNode("[Reply]"))
+        ptag.appendChild(atag)
+        target.appendChild(ptag);
       }
     }
     function focusPostText() {
