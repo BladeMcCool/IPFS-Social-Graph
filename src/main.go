@@ -16,11 +16,12 @@ func main() {
 		WlProfileIds: map[string]bool{},
 		BaseWlProfileIds: map[string]bool{},
 		WlProfileIdMutex: sync.RWMutex{},
+		ListenPort: getServiceHttpListenPort(),
 	}
 	initializers()
 	go IPFS.StartIPNSPeriodicUpdater()
 	go service.setupWl(getWlBaseProfileIdList())
-	service.Start(getServiceHttpListenPort())
+	service.Start()
 }
 
 func initializers() {

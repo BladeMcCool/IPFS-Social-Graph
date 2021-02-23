@@ -301,7 +301,7 @@ func Test_make_profile(t *testing.T) {
 	//in order to create the profile record it needs a social graph tip.
 
 	//in order to create that now, we first need the cid of some content that is our post.
-	cid := IPFS.addContentToIPFS([]byte("I am potato lord !!! hello world ??? FUCK")) // I suspect there may even be other nodes already hosting this content.
+	cid := IPFS.addContentToIPFS([]byte("I am potato lord !!! hello world ???")) // I suspect there may even be other nodes already hosting this content.
 	fmt.Printf("the content cid is %s\n", cid)
 
 	//then we can create a graph node that references our content
@@ -741,16 +741,18 @@ func Test_b64_privkey_from_browser(t *testing.T) {
 }
 
 func Test_http_service(t *testing.T) {
-	IPFS.InitProfileCache()
+	initializers()
 	service := &APIService{
 		TimeService: &defaultTimeService{},
+		FilePathOverride: "../web",
+		ListenPort: "4588",
 	}
 
 	//uncomment these two lines to run the server and do manual interaction with it.
-	//go IPFS.StartIPNSPeriodicUpdater()
-	//service.Start()
-	//log.Printf("but i no see this?")
-	//return
+	go IPFS.StartIPNSPeriodicUpdater()
+	service.Start()
+	log.Printf("but i no see this?")
+	return
 
 	//jsonbody := `{"pubkey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvmD0guNxb3MBHIXNNaYFNoBLSJQh0BUWYQsbb6GUdG3URY8Gc98U/o6genJ2YZrhE0JTr7wl7TqJvvnOHrhS1CTX04qp6Yq/u2y8SYP3wcYxzd00aFI9aAd7vpPSe1GQPdpbY9XEeMQKOkbYDfmIefU/r+WAKiGfJFKMO8PhLsatWRwDaapL3MusqJxk2PyGjfS210yWhSh8ReJRAMCEkRQWiN17KXGlCN/g7SRnmHRAfyo7wsl3mClJunGgKe6i0brWvibcu3/YWaFhdnzpxuxp1Bw0VJgoccQy2JXKzwTa8GhZFFbJ4COMJAsHBsmhAVKW2jRg60IULayQo1QnWwIDAQAB","text": "i am the very model of a modern major pain in the goddam ass."}`
 	//jsonbody := `{"pubkey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvmD0guNxb3MBHIXNNaYFNoBLSJQh0BUWYQsbb6GUdG3URY8Gc98U/o6genJ2YZrhE0JTr7wl7TqJvvnOHrhS1CTX04qp6Yq/u2y8SYP3wcYxzd00aFI9aAd7vpPSe1GQPdpbY9XEeMQKOkbYDfmIefU/r+WAKiGfJFKMO8PhLsatWRwDaapL3MusqJxk2PyGjfS210yWhSh8ReJRAMCEkRQWiN17KXGlCN/g7SRnmHRAfyo7wsl3mClJunGgKe6i0brWvibcu3/YWaFhdnzpxuxp1Bw0VJgoccQy2JXKzwTa8GhZFFbJ4COMJAsHBsmhAVKW2jRg60IULayQo1QnWwIDAQAB","profiletip": "QmUGpKuhjAs4Absv5n4K8aFXAZCU4G9RncoqhvxnJJkvT1"}`

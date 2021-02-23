@@ -20,10 +20,12 @@ type APIService struct {
 	WlProfileIds map[string]bool
 	BaseWlProfileIds map[string]bool
 	WlProfileIdMutex sync.RWMutex
+	FilePathOverride string
+	ListenPort string
 }
 //var WlProfileIds = map[string]bool{}
 //var WlProfileIdMutex = sync.RWMutex{}
-func (s *APIService) Start(servicePort string) {
+func (s *APIService) Start() {
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, // All origins
 		AllowedMethods: []string{"GET","POST"},
@@ -31,23 +33,26 @@ func (s *APIService) Start(servicePort string) {
 
 	router := mux.NewRouter()
 
+	filePath := "./web"
+	if (s.FilePathOverride != "") {
+		filePath = s.FilePathOverride
+	}
+
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./web/index.html")
+		http.ServeFile(w, r, filePath + "/index.html")
 	})
+	router.PathPrefix("/lib").Handler(http.StripPrefix("/lib", http.FileServer(http.Dir(filePath + "/lib"))))
 
-	router.HandleFunc("/unsignedGraphNodeForPost", s.unsignedGraphNodeForPost).Methods("POST")
-	router.HandleFunc("/unsignedProfileWithFirstPost", s.unsignedProfileWithFirstPost).Methods("POST")
-	router.HandleFunc("/publishedProfileCid", s.publishedProfileCid).Methods("POST")
-	router.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET")
-	router.HandleFunc("/history", s.history).Methods("POST")
-
-	//TODO fix this stuff below maybe can be one function to get the two files ??? maybe i can drop localforage into the one file.
-	router.HandleFunc("/peerId", s.peerId).Methods("GET")
-
+	authedRouter := router.PathPrefix("/service").Subrouter()
 	// some middleware to auth by pubkey
-	router.Use(s.WlProfileIdViaPubkeyHeaderAuthMiddleware)
+	authedRouter.Use(s.WlProfileIdViaPubkeyHeaderAuthMiddleware)
+	authedRouter.HandleFunc("/unsignedGraphNodeForPost", s.unsignedGraphNodeForPost).Methods("POST")
+	authedRouter.HandleFunc("/unsignedProfileWithFirstPost", s.unsignedProfileWithFirstPost).Methods("POST")
+	authedRouter.HandleFunc("/publishedProfileCid", s.publishedProfileCid).Methods("POST")
+	authedRouter.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET")
+	authedRouter.HandleFunc("/history", s.history).Methods("POST")
 
-	err := http.ListenAndServe(":"+servicePort,  c.Handler(router))
+	err := http.ListenAndServe(":"+s.ListenPort,  c.Handler(router))
 	if err != nil {
 		panic(err)
 	}
@@ -447,15 +452,7 @@ func (s *APIService) IPNSDelegateName(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte(*ipfsName))
 }
 func (s *APIService) peerId(w http.ResponseWriter, r *http.Request) {
-	//seems silly to be doing this as a server method doesnt it? you would think, hey this should be easy in the browser, after all that is where the pubkey is coming from ...
-	// well you would be wrong.
-	// please, please somebody demonstrate to me with as little javascript code and external support libraries as possible how to take the base64 pubkey der encoded asn.1 bullshit and actually get the bytes of the pubkey out to feed them through multihash and base58
-	// i have yet to be able to put it together in the browser and spent too much time already trying. soooo we get this grossness here instead for now.
-	// some leads in the JS universe ...
-		// multihashing (https://github.com/multiformats/js-multihashing) minfied, https://unpkg.com/multihashing@0.3.3/dist/index.min.js -- seemed to work properly, the output started with the right two bytes but my input was improper
-		// https://github.com/cryptocoinjs/bs58 base58, output looked right, started with Qm when fed in with sha256 multihash output -- doing `browserify -r bs58 | uglifyjs > bundle.js` and putting the bundle in <script> let me 'require('bs58')
-		// lead on an asn.1/der lib that might work for this: https://pkijs.org/ ... what i have not tried yet is taking a PEM style formatted output from pubkey and working with this lib to get the pubkey raw bytes out to feed them into multihash
-
+	//I figured out how to do this in the browser so its kind of deprecated now.
 	pubkeyB64 := r.Header.Get("X-Pubkey-B64")
 	if pubkeyB64 == "" {
 		w.WriteHeader(http.StatusNoContent)

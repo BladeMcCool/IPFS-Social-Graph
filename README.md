@@ -68,6 +68,10 @@ Run:
   
  - Blacklisting services with blacklist of post content cids. Multiple blacklists could be subscribed to, it would just put all the cids on one master block list. Could manually exclude things of interest if the subscribed block lists are too agressive.  
   
+ - "Verification" services which would require some kind of identification vetting process and then be willing to sign off on some profileId as being "verified". Different levels and quality of verification can be provided by different providers and it would be up to the clients which verification services they want to trust the opions of and to what degree.
+ 
+ - Timestamp oracles, as right now the timestamps on posts are self generated and could claim to be from the future or the past. The graphnode sequencing and reply inter-relations between graph chains will currently provide some relative time meta info, but having a recognized service available which could add its signature of validity to specific post timestamps could provide better assurances for correct message ordering in a timeline display.
+ 
  - Moderation subscription? you would not see any new content until it had been approved by a moderation team/group of your choosing  
   
  - Centralized portals? Where you would retain your private key for signing things in the browser client but the timeline presented to you is curated or managed by a service with terms. If you were unhappy with those terms at any point you could just go use an independent client or a different centralized portal using your keys. Centralized portals could even offer you the sacrifice of managing your keys for you, at the expense of you no longer truly owning your data. However for some people, this may be close to the the desired experience. Such centralized platforms could also possibly offer montetization paths.  
