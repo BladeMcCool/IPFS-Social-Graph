@@ -73,7 +73,7 @@ type Profile struct {
 	Id string //a sha256 hash of the output of marshalled ipfs pubkey protobuf, converted to base58, aka the IPNS name
 	Pubkey []byte //output of x509.MarshalPKCS1PublicKey(&keyReadback.PublicKey), so ppl should be able to use this to verify signatures as well as encrypt private messages
 	//IPNS string // ipns address where this profile could be found UPDATE now I know this can be derived from the pubkey, and how to do so, it does not need to be stored as well.
-	Tip string // cid of the tip GraphNode of this profiles publicly available social graph. Clients would start here and spider back through previous nodes.
+	GraphTip string // cid of the tip GraphNode of this profiles publicly available social graph. Clients would start here and spider back through previous nodes.
 	//Socials map[string]string // suggested keys would be things like twitter, facebook, minds, etc. with links to the profiles
 	DisplayName string
 	Bio string

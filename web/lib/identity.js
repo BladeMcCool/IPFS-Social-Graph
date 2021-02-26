@@ -40,11 +40,15 @@ async function setIdentity(keyname) {
 
     document.getElementById("dispname").value = identity["dispname"] ? identity["dispname"] : ""
     document.getElementById("bio").value = identity["bio"] ? identity["bio"] : ""
+
     document.getElementById("profileid").value = identity["profileid"] ? identity["profileid"] : ""
     document.getElementById("ipnsdelegate").value = identity["ipnsdelegate"] ? identity["ipnsdelegate"] : ""
     document.getElementById("profiletip").value = identity["profiletip"] ? identity["profiletip"] : ""
     document.getElementById("graphtip").value = identity["graphtip"] ? identity["graphtip"] : ""
     document.getElementById("sendprivkey").checked = identity["sendprivkey"] ? identity["sendprivkey"] : false
+
+    document.getElementById("currentprofile_detail").style.display = "inline"
+    document.getElementById("importprivkeyb64_container").style.display = "none"
 
     document.getElementById("posttext").value = ""
     document.getElementById("inreplyto").value = ""
@@ -63,17 +67,11 @@ async function setIdentity(keyname) {
 
 async function newIdentity() {
     console.log('newIdentity: identities is: ', identities);
-    newidentname = document.getElementById("newidentname").value.trim()
-    if (!newidentname) {
-        alert("Please type a name for it")
-        console.log("not creating identity with no name")
+    newidentname = getNewIdentName()
+    if (newidentname == undefined) {
         return
     }
-    if (identities[newidentname]) {
-        alert("Name already in use, choose something else or delete it first.")
-        console.log("not overwriting existing identity named", newidentname)
-        return
-    }
+
     keypair = await generateKey()
     console.log("keypair", keypair)
     spki = await window.crypto.subtle.exportKey('spki', keypair.publicKey)
@@ -166,19 +164,14 @@ function unselectIdentity() {
     document.getElementById("pubkeyb64").innerHTML = ""
     document.getElementById("privkeyb64").innerHTML = ""
     displayTimelineTexts("[]")
+    document.getElementById("currentprofile_detail").style.display = "none"
+    document.getElementById("importprivkeyb64_container").style.display = "inline"
 }
 
 async function renameSelectedIdentity() {
     console.log('newIdentity: identities is: ', identities);
-    newidentname = document.getElementById("newidentname").value.trim()
-    if (!newidentname) {
-        alert("Please type a name for it")
-        console.log("cannot rename to nothing")
-        return
-    }
-    if (identities[newidentname]) {
-        alert("Name already in use, choose something else or delete it first.")
-        console.log("not overwriting existing identity named", newidentname)
+    newidentname = getNewIdentName()
+    if (newidentname == undefined) {
         return
     }
 
@@ -193,6 +186,57 @@ async function renameSelectedIdentity() {
     await updateSavedIdentites(identities)
     clearIdentName()
 }
+function getNewIdentName() {
+    newidentname = document.getElementById("newidentname").value.trim()
+    if (!newidentname) {
+        alert("Please type a name for it")
+        console.log("not creating identity with no name")
+        return undefined
+    }
+    if (identities[newidentname]) {
+        alert("Name already in use, choose something else or delete it first.")
+        console.log("not overwriting existing identity named", newidentname)
+        return  undefined
+    }
+    return newidentname
+}
+async function importKeyAsIdentity() {
+    newidentname = getNewIdentName()
+    if (newidentname == undefined) {
+        return
+    }
+
+    pkcs8b64 = document.getElementById("importprivkeyb64").value.trim()
+    // console.log("privkey b64 in pkcs8", pkcs8b64)
+    var spkib64
+    try {
+        spkib64 = await derivePubkeyFromPrivkey(pkcs8b64)
+    } catch(err) {
+        console.log("error with derivePubkeyFromPrivkey from ", pkcs8b64)
+        console.log(err)
+        return
+    }
+    console.log("pubkey b64 in PKIX", spkib64)
+
+    newIdentitySettings = {
+        "pub":spkib64,
+        "priv":pkcs8b64,
+        "dispname":"",
+        "bio":"",
+        "graphtip":"",
+        "profiletip":"",
+        "profileid":"",
+        "ipnsdelegate":"",
+    }
+
+    identities[newidentname] = newIdentitySettings
+    addIdentityToChoices(newidentname)
+    scrapeSettingsIntoSelectedIdentity() //so that when we updateSavedIdentites we keep whatever was in the fields.
+    await setIdentity(newidentname)
+    await updateSavedIdentites(identities)
+    clearIdentName()
+}
+
 
 async function chooseIdentity(keyname) {
     await cancelCurrentHistoryRequest()

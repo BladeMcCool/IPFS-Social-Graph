@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -26,12 +27,36 @@ import (
 	//b58 "github.com/mr-tron/base58/base58"
 )
 
+var commonHardcodeTestKey *rsa.PrivateKey
+var commonHardcodeProfileId = "QmabPmcVwPYnEAeTmh7rTJ55QifqRo3fADRFtSSFrK9Yfw"
+var commonIpfsTestKey *rsa.PrivateKey
+var commonIpfsKeyProfileId = "" //determined below. this key will change from install to install.
+
+func init() {
+	var err error
+	prikeyB64 := `MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCSeO6s8AvMX+oXezQg2HMXVtNzucEXY3s2iJZyVoAtg7v/MfR8rynizNSQjYzjxTAXnwVVHlPqdHBOOKgWFdOrI3DsqMJzE7SaHMBSxMniBtnkj3rB6Tabj46j5WivLLso/e81cBNDeDT5HoF22aMIdRnB+2+JbRuVio7odJL/N7/PS7kqy4pbuds/Y3qUoUf39esrEO8r+ckD+TsriZ7IabiNmieuzXVMskFL4JNWYCy+GVjfe4ZKaXH39Hzq6I+9CcZxIOQ3+lcO/Eea8TNCP5x545Gsz5jn7lWTxry8vcQ1HGwefaMZM+I40aB2c1NMuEiM+lDTTrCrEHGPt9jdAgMBAAECggEAEHBMnzGgrVsNZ32/E7mfLx0iRbBxDJowY6YwNlxhbdpFUOaPISg6i/b/m0qbp5uDon8JJuysr9lKGmlO6g2gkCo92/2ztx0czZgQ+KkX3Et3DGkS9qzhIVPbBydx2IktZzQasvVlYBLfZR8omglifApCbgw1UCfj6uReVhXxQn3YiCNbbQbArQeThb4EcX533jOfc4jqlEYtbAXNPNy72hkwLaHFiaTLaRK437YILFGoGkig9Ja1awrkDqq+Wd+RHIbEOGpVjRvLIitE/p/ge7ap0UOmEFD3RARSDpff1pa22JvPryQQTpt4smt2XBEc/GqChCcZ29mglf+AWYpK2QKBgQDHQnkDOJH/HdsR6dFePozVQMf/XvdYe8R7ysAJ0SH0i1qpTcD6AUxAYCcwjRNb3LWpU6qelP6IROATCsODg7ZcJBRjQltq2zrbdjeGIGTtOW0HuHBFmlMAK7XG6ywOPcnm0LZR/MJyDBxw8B/Ty2/LOlPmLmmpaIRzYqDs7vq/uQKBgQC8LmaanGFsaXaqT9XRR1oJdYdUegr74tlvf+Mnf2Ll38ejfY86qbm6cNvZjjVU1qmVxNAw4/AnP4mGIebdam+SdtPleBqQn25jI4f0TnaNLEH7egXZks2jKy0uoC8MoKRfTusrSJvKYQFvZBAsIyc0c57H49+DXpdfvosomhGMRQKBgEoE1mEs7YcAdzWTTvQcdkJtmx2xEF7tMxLtQSMkbeGitp33xTzZqJKtZUFy1oMkXNM2wkXAgUDrnPVV5UUAc4iM2on4x27NW3LU2lFXzUYWM/tPN12Ts0t38UGgcLAloc+9Lk0MgMrO1u3ZNWl+w9uRokL6cMO+kJ0wQSliqQD5AoGBAIvHS598mUEV9Xb8Zi5VeaOdETDGlnITRr9zlx83mBZ36qqeEU3Z1IOQYT1wTF0ANmdxEdO+/BurLlPbysicztNUQIEqfVD/m9c4BTyLK7QhM8HAGahLS0PwRldj1I7kpDPHQxebj1z8QTykbv7Z/b0QRNjlgpjqIjaUKnm2N2KhAoGABuoD4423kXDcVPAE2KuAYTE8EWfWKOvDCFNxIKhT2akgtPwmcmksxHZH1bjaV8crh9fxb86VgX7AiWRY58ohZAKBXdYarOYm/hO/sZf9qXTpWB0w0GT7TbWIOfLRA/HaO64Wcr25H8kIJxnGGMi+CXO7hjbuetgxhLPdBth+c98=`
+	commonHardcodeTestKey, err = getRSAPrivatekeyFromB64(prikeyB64)
+	if err != nil {
+		panic("failed to set up for tests")
+	}
+
+	err = IPFS.makeKeyInIPFS("test_key")
+	if err != nil && err.Error() != "key/gen: key with name 'test_key' already exists" {
+		panic("failed to set up for tests")
+	}
+	commonIpfsTestKey = Crypter.readBinaryIPFSRsaKey("test_key")
+	commonIpfsKeyProfileId = Crypter.getPeerIDBase58FromPubkey(&commonIpfsTestKey.PublicKey)
+
+	initializers()
+	log.Println("test init complete")
+}
+
 func Test_write_out_and_read_back_an_rsa_key__keys_match(t *testing.T) {
 	fileName := "testkey"
 	keyCreated := Crypter.makeKey(fileName)
 	keyReadback := Crypter.readKey(fileName)
 
-	removeLocalFile(fileName)
+	_ = os.Remove(fileName)
 	if !keyReadback.Equal(keyCreated) {
 		t.Errorf("keys dont match??")
 	}
@@ -39,17 +64,18 @@ func Test_write_out_and_read_back_an_rsa_key__keys_match(t *testing.T) {
 
 func Test_signature(t *testing.T) {
 	//_ = makeKey("horse")
-	keyReadback := Crypter.readKey("gooodkey")
+	//keyReadback := Crypter.readKey("gooodkey")
 
 	// Before signing, we need to hash our message
 	// The hash is what we actually sign
 	msg := []byte("concatenation of all the post data, done in a canonical order")
 	msgHashSum := Crypter.makeMsgHashSum(msg)
-	signature := Crypter.makeSig(keyReadback, msgHashSum)
+	signature := Crypter.makeSig(commonHardcodeTestKey, msgHashSum)
 
 
 	//verify signature now
-	err := rsa.VerifyPSS(&keyReadback.PublicKey, crypto.SHA256, msgHashSum, signature, nil)
+	err := rsa.VerifyPSS(&commonHardcodeTestKey.PublicKey, crypto.SHA256, msgHashSum, signature, nil)
+	require.Nil(t, err)
 	if err != nil {
 		fmt.Println("could not verify signature: ", err)
 		t.Errorf("could not verify signature")
@@ -61,22 +87,24 @@ func Test_signature(t *testing.T) {
 }
 
 func Test_use_binary_rsa_key_from_ipfs(t *testing.T) {
-
-
-	keyReadback := Crypter.readBinaryIPFSRsaKey("binary_rsa_privkey")
+	var err error
+	//err := IPFS.makeKeyInIPFS("test_key")
+	//require.Nil(t, err)
+	//keyReadback := Crypter.readBinaryIPFSRsaKey("test_key")
 
 	// Before signing, we need to hash our message
 	// The hash is what we actually sign
 	msg := []byte("concatenation of all the post data, done in a canonical order")
 	msgHashSum := Crypter.makeMsgHashSum(msg)
-	signature := Crypter.makeSig(keyReadback, msgHashSum)
+	signature := Crypter.makeSig(commonIpfsTestKey, msgHashSum)
 
-	pubkeyBytes := x509.MarshalPKCS1PublicKey(&keyReadback.PublicKey)
+	pubkeyBytes := x509.MarshalPKCS1PublicKey(&commonIpfsTestKey.PublicKey)
 	_ = pubkeyBytes
 
 
 	//verify signature now
-	err := rsa.VerifyPSS(&keyReadback.PublicKey, crypto.SHA256, msgHashSum, signature, nil)
+	err = rsa.VerifyPSS(&commonIpfsTestKey.PublicKey, crypto.SHA256, msgHashSum, signature, nil)
+	require.Nil(t, err)
 	if err != nil {
 		fmt.Println("could not verify signature: ", err)
 		t.Errorf("could not verify signature")
@@ -139,8 +167,11 @@ func _TestKeyGen(t *testing.T) {
 
 func TestPublishDetailsWithKey(t *testing.T) {
 	//var examplesHashForIPNS = "/ipfs/Qmbu7x6gJbsKDcseQv66pSbUcAA3Au6f7MfTYVXwvBxN2K"
-	var testKey = "testKey3" // feel free to change to whatever key you have locally
-	var expectName = "QmQFsV3XBtEoYnABnJLAey78LVx1Aexc7k3xtppVynv8RU" //seems this is the name that testKey3 will get
+
+	//Crypter.readBinaryIPFSRsaKey("") //"testKey3" // feel free to change to whatever key you have locally
+	//var testKey = Crypter.readBinaryIPFSRsaKey("test_key")
+	////var expectName = "QmQFsV3XBtEoYnABnJLAey78LVx1Aexc7k3xtppVynv8RU" //seems this is the name that testKey3 will get
+	//var expectName = Crypter.getPeerIDBase58FromPubkey(&testKey.PublicKey)
 	//t.Skip()
 	shell := shell.NewShell("localhost:7767")
 	stringreader := strings.NewReader("whee i'm in ipfs now! and new data gets new hash.")
@@ -148,7 +179,7 @@ func TestPublishDetailsWithKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := shell.PublishWithDetails("/ipfs/"+ examplesHashForIPNS, testKey, time.Second * 100, time.Second * 100, false)
+	resp, err := shell.PublishWithDetails("/ipfs/"+ examplesHashForIPNS, "test_key", time.Second * 100, time.Second * 100, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +187,7 @@ func TestPublishDetailsWithKey(t *testing.T) {
 	if resp.Value != "/ipfs/" + examplesHashForIPNS {
 		t.Fatalf(fmt.Sprintf("Expected to receive %s but got %s", examplesHashForIPNS, resp.Value))
 	}
-	if resp.Name != expectName {
+	if resp.Name != commonIpfsKeyProfileId {
 		t.Fatalf("got something unexpected for the name :(")
 	}
 
@@ -167,9 +198,14 @@ func TestPublishDetailsWithKey(t *testing.T) {
 }
 
 func Test_get_peer_id_from_pubkey_in_different_ways(t *testing.T) {
-	//ks, err := keystore.NewFSKeystore("/home/chris/work/otm/compose/ipfs0/keystore/")
-	expectName := "QmQFsV3XBtEoYnABnJLAey78LVx1Aexc7k3xtppVynv8RU" //seems this is the name that testKey3 will get
+	//first drop commonHardcodeTestKey into the filesystem for ipfs ...
+	_ = os.Remove(Crypter.ipfsKeystorePath + "/" + "binary_rsa_privkey")
+	err := Crypter.writeBinaryIPFSRsaKey(commonHardcodeTestKey, "binary_rsa_privkey")
+	require.Nil(t, err)
 
+	//ks, err := keystore.NewFSKeystore("/home/chris/work/otm/compose/ipfs0/keystore/")
+	//expectName := "QmQFsV3XBtEoYnABnJLAey78LVx1Aexc7k3xtppVynv8RU" //seems this is the name that testKey3 will get
+	expectName := commonHardcodeProfileId
 	//get it using basically the same code that ipfs itself uses
 	//which, upon deeper reading, showed me that its just taking the public key out of the private key, sticking that into pubkey protobuf format, serializing that, hash that, and b58 the result.
 	gotName := Crypter.getIPFSNameFromBinaryRsaKey("binary_rsa_privkey")
@@ -206,7 +242,7 @@ func Test_encrypt_decrypt_sign_verify(t *testing.T) {
 	// ...
 	// https://play.golang.org/p/tldFUt2c4nx
 	modulusBytes := base64.StdEncoding.EncodeToString(privateKey.N.Bytes())
-	privateExponentBytes := base64.StdEncoding.EncodeToString(privateKey.D.Bytes())
+								privateExponentBytes := base64.StdEncoding.EncodeToString(privateKey.D.Bytes())
 	fmt.Println(modulusBytes)
 	fmt.Println(privateExponentBytes)
 	fmt.Println(publicKey.E)
@@ -285,18 +321,13 @@ func Test_JSONTime(t *testing.T) {
 
 func Test_make_profile(t *testing.T) {
 	//lets use one of the keys we made had IPFS make earlier (copied testKey3 to this local binary_rsa_privkey)
-	keyReadback := Crypter.readBinaryIPFSRsaKey("binary_rsa_privkey")
+	//keyReadback := Crypter.readBinaryIPFSRsaKey("binary_rsa_privkey")
+	keyReadback := commonIpfsTestKey
 
 	//we can get an ID for this key but taking the pubkey and hashing it.
 	pubKeyBytes := x509.MarshalPKCS1PublicKey(&keyReadback.PublicKey)
 	pubKeyHash := Crypter.makeMsgHashSum(pubKeyBytes)
 	_ = pubKeyHash
-
-	//we can get the IPNS name by adding something to IPNS with the same key
-	// TODO get stuff connected with the keys better to be able to do a end to end key creation and usage
-	//NOTE i copied testKey3 that we created earlier to the local binary rsa privkey,
-	// so we will instruct IPNS to be used with the testKey3 identity
-	IPNSName := "QmQFsV3XBtEoYnABnJLAey78LVx1Aexc7k3xtppVynv8RU" // this came from experiment above where we successfully created IPNS entry using testKey3
 
 	//in order to create the profile record it needs a social graph tip.
 
@@ -317,7 +348,7 @@ func Test_make_profile(t *testing.T) {
 		},
 		PublicFollow: nil,
 	}
-	_ = IPNSName
+	//_ = IPNSName
 	_ = socialTip
 
 	//we have to sign this data with our private key for authenticity.
@@ -334,7 +365,7 @@ func Test_make_profile(t *testing.T) {
 		Id:      string(pubKeyHash),
 		Pubkey:  pubKeyBytes,
 		//IPNS:    IPNSName,
-		Tip:     tipCid,
+		GraphTip: tipCid,
 		//Socials: nil,
 	}
 	profileJson, err := json.Marshal(profile)
@@ -348,15 +379,16 @@ func Test_make_profile(t *testing.T) {
 
 	//this is where we can update our IPNS entry to point it to this latest profile cid.
 	//and of course, the server component would be able to take in an update much faster than IPNS
-	_ = IPFS.publishIPNSUpdate(profileCid, "testKey3")
+	IPNSName := IPFS.publishIPNSUpdate(profileCid, "test_key")
 	// i already know the ipns for the hardcoded key i'm toying with is QmQFsV3XBtEoYnABnJLAey78LVx1Aexc7k3xtppVynv8RU
+	require.Equal(t, commonIpfsKeyProfileId, IPNSName )
 
 	fmt.Println("got here without dying")
 }
 
 func Test_sign_and_verify_graphnode(t *testing.T) {
 	//lets use one of the keys we made had IPFS make earlier (copied testKey3 to this local binary_rsa_privkey)
-	keyReadback := Crypter.readBinaryIPFSRsaKey("binary_rsa_privkey")
+	keyReadback := Crypter.readBinaryIPFSRsaKey("test_key")
 	post := Post{
 		MimeType: "text/plain",
 		Cid: "abcdpotatoes",
@@ -382,7 +414,7 @@ func Test_sign_and_verify_graphnode(t *testing.T) {
 
 func Test_sign_and_verify_profile(t *testing.T) {
 	//lets use one of the keys we made had IPFS make earlier (copied testKey3 to this local binary_rsa_privkey)
-	keyReadback := Crypter.readBinaryIPFSRsaKey("binary_rsa_privkey")
+	keyReadback := Crypter.readBinaryIPFSRsaKey("test_key")
 	tl := &Timeline{crypter: Crypter, ipfs: IPFS}
 	profile := tl.createSignedProfile(
 		keyReadback,
@@ -408,9 +440,12 @@ func (ts *testTimeService) GetTime() JSONTime {
 	return reportedTime
 }
 
-
-func Test_create_chain_of_posts(t *testing.T) {
-	// make a profile, I suppose until we make a first post it can have a blank value for Tip.
+func Test_create_and_read_back_chain_of_posts(t *testing.T) {
+	// make a profile, I suppose until we make a first post it can have a blank value for GraphTip.
+	createdProfileInfo := createChainOfPosts(t)
+	readBackChainOfPosts(t, createdProfileInfo)
+}
+func createChainOfPosts(t *testing.T) []*TLProfile {
 	timeService := &testTimeService{
 		curTime: JSONTime(time.Now().UTC()),
 		incrementSec: 17,
@@ -421,19 +456,21 @@ func Test_create_chain_of_posts(t *testing.T) {
 		Bio:           "Friendly Hobbit",
 		FirstPostText: "My Uncle has a magical ring.",
 		TimeService:  timeService,
-	}, false)
+		IPNSDelegated: true,
+	})
 	require.Nil(t, err)
-	frodoPostGraphNodeCid := frodoTl.profile.Tip
-	t.Logf("created frodo, profile id/ipns is %s, profile cid is %s, tip graphnode is %s", frodoTl.profileId, frodoTl.profile.cid, frodoTl.profile.Tip  )
+	frodoPostGraphNodeCid := frodoTl.profile.GraphTip
+	t.Logf("created frodo, profile id/ipns is %s, profile cid is %s, tip graphnode is %s", frodoTl.profileId, frodoTl.profile.cid, frodoTl.profile.GraphTip)
 
 	samTl, err := CreateTimelineWithFirstTextPost(&TLCreateProfileArgs{
 		DisplayName:   "Samwise Gamgee",
 		Bio:           "Gardiner Extraordinaire",
 		FirstPostText: "I'm going to enjoy tending my garden right here in the Shire for the next few months.",
 		TimeService:  timeService,
-	}, false)
+		IPNSDelegated: true,
+	})
 	require.Nil(t, err)
-	t.Logf("created sam, profile id/ipns is %s, profile cid is %s, tip graphnode is %s", samTl.profileId, samTl.profile.cid, samTl.profile.Tip  )
+	t.Logf("created sam, profile id/ipns is %s, profile cid is %s, tip graphnode is %s", samTl.profileId, samTl.profile.cid, samTl.profile.GraphTip)
 
 
 	t.Logf("frodo profile current cid: %s", frodoTl.profile.cid)
@@ -444,21 +481,24 @@ func Test_create_chain_of_posts(t *testing.T) {
 		Bio:           "Wizard",
 		FirstPostText: "Off to the Shire to see my friend Bilbo",
 		TimeService:  timeService,
-	}, false)
+		IPNSDelegated: true,
+	})
 
 	smeagolTl, err := CreateTimelineWithFirstTextPost(&TLCreateProfileArgs{
 		DisplayName:   "Gollum",
 		Bio:           "Gollum",
 		FirstPostText: "Gollum",
 		TimeService:  timeService,
-	}, false)
+		IPNSDelegated: true,
+	})
 
 	bilboTl, err := CreateTimelineWithFirstTextPost(&TLCreateProfileArgs{
 		DisplayName:   "Bilbo Baggins",
 		Bio:           "Adventurous Hobbit, Non-Thief.",
 		FirstPostText: "I've been there -- and I got back again. Ask me about it.",
 		TimeService:  timeService,
-	}, false)
+		IPNSDelegated: true,
+	})
 
 
 	//Sam saw someone repost Frodo posting about rings and has something to say along with following him.
@@ -467,7 +507,7 @@ func Test_create_chain_of_posts(t *testing.T) {
 	samPostTLGraphNode.AddPublicFollow([]string{frodoTl.profileId})
 	samTl.PublishGraphNode(samPostTLGraphNode)
 	require.Nil(t, err)
-	t.Logf("sam profile, updated cid: %s, updated tip: %s", samTl.profile.cid, samTl.profile.Tip)
+	t.Logf("sam profile, updated cid: %s, updated tip: %s", samTl.profile.cid, samTl.profile.GraphTip)
 
 	//Frodo has somehow discovered that Sam followed him, so he follows back (without text reply)
 	//Frodo also follows Gandalf and Bilbo because why not.
@@ -505,7 +545,7 @@ func Test_create_chain_of_posts(t *testing.T) {
 	bilboTl.PublishGraphNode(bilboTlPostTLGraphNode)
 
 	t.Logf("publishing frodo and sam latest profile info to their respective IPNS...")
-	var wg sync.WaitGroup
+	//var wg sync.WaitGroup
 	ipnsToPublish := []*TLProfile{
 		frodoTl.profile,
 		samTl.profile,
@@ -513,21 +553,25 @@ func Test_create_chain_of_posts(t *testing.T) {
 		smeagolTl.profile,
 		bilboTl.profile,
 	}
-	wg.Add(len(ipnsToPublish))
+
 	for _, profile := range ipnsToPublish {
-		go wgIPNSPublisher(&wg, profile)
+		Federation.Set(profile.Id, profile.cid)
 	}
-	wg.Wait()
+	log.Printf("IPNSDelegatedProfileCids: %#v", Federation.IPNSDelegatedProfileCids)
+
+
+	//wg.Add(len(ipnsToPublish))
+	//for _, profile := range ipnsToPublish {
+	//	go wgIPNSPublisher(&wg, profile)
+	//}
+	//wg.Wait()
 	t.Log("ipns updates Completed")
+	return ipnsToPublish
 }
-func wgIPNSPublisher(wg *sync.WaitGroup, tlProfile *TLProfile) {
-	defer wg.Done()
-	log.Printf("doing %s ipns update with %s...\n", tlProfile.DisplayName, tlProfile.cid)
-	profileIPNS := IPFS.publishIPNSUpdate(tlProfile.cid, tlProfile.ipfsKeyName)
-	log.Printf("%s ipns: %s\n", tlProfile.ipfsKeyName, profileIPNS)
-}
-func Test_read_chain_of_posts(t *testing.T) {
-	initializers()
+
+
+func readBackChainOfPosts(t *testing.T, createdProfileInfo []*TLProfile) {
+	//needs to do it in a way using ipns delegate federation as we put the cids in there only, trying to avoid ipns in tests except for basic smokte test.
 	for _, name := range []string{
 		"bilbo-baggins",
 		"frodo-baggins",
@@ -535,22 +579,32 @@ func Test_read_chain_of_posts(t *testing.T) {
 		"gollum",
 		"samwise-gamgee",
 	} {
-		privateKey := Crypter.readBinaryIPFSRsaKey(Crypter.keystorePath + name)
+		privateKey := Crypter.readBinaryIPFSRsaKey(name)
 		t.Logf("keyname: %s profileId %s", name, Crypter.getPeerIDBase58FromPubkey(&privateKey.PublicKey))
 	}
 	//panic("nope")
 
+	//going to start with frodo, so need to figure frodos profile id we created
+	var frodoProfileId string
+	for _, e := range createdProfileInfo {
+		if e.DisplayName == "Frodo Baggins" {
+			frodoProfileId = e.Id
+			break
+		}
+	}
 	//this should be run after the one above.
 	frodoTl := &Timeline{
 		crypter:   Crypter,
 		ipfs:      IPFS,
-		profileId: "QmUGQHvJcyR3CpcMAwjg3BGJaXTLb4QgesVDy1yt85E56w", // frodo
+		profileId: frodoProfileId,
+		//profileId: "QmUGQHvJcyR3CpcMAwjg3BGJaXTLb4QgesVDy1yt85E56w", // frodo
 		//profileId: "QmU6WDwv5MFyZWLDZjCUbDPLPwBj3QjmPNUc2Bcjfi6hGP", //gandalf
 		//profileId: "QmPj1shPErUCCdpffMtcBUmE64ZqFeigirrUSbu9qznc7c", //bilbo
 		//profileId: "QmauiUf3x6C9Xx9cPS4hfQRaHpbHXE9MXvetpiCiMvNU6G", //sam
 		//profileId: "QmNup8hD2YEaGbHt7BpKub9oAM1VrGAWe44a3p5rdFWwK4", //smeagol
 
 	}
+	log.Printf("IPNSDelegatedProfileCids: %#v", Federation.IPNSDelegatedProfileCids)
 
 	err := frodoTl.LoadProfile()
 	require.Nil(t, err)
@@ -593,11 +647,11 @@ func Test_read_chain_of_posts(t *testing.T) {
 	// also lets finally get Smeagol and Gandalf in on the action.
 }
 
-func Test_read_chain_of_posts2(t *testing.T) {
+func _Test_read_chain_of_posts2(t *testing.T) {
+	//intention of this was to just test history collectino of a profile i was working with in the browser
+
 	var err error
 	initializers()
-	IPNSDelegateName := IPFS.getIPNSDelegateName()
-	IPNSDelegatedProfileCid, err = IPFS.getCurrentDelegatedProfileCids(*IPNSDelegateName)
 
 	tl := &Timeline{
 		crypter: Crypter,
@@ -618,10 +672,10 @@ func Test_read_chain_of_posts2(t *testing.T) {
 		_ = lineIndex
 		log.Println(text)
 	}
-
 }
+
 func Test_b64_pubkey_from_browser(t *testing.T) {
-	pubkeyb64 := `MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvmD0guNxb3MBHIXNNaYFNoBLSJQh0BUWYQsbb6GUdG3URY8Gc98U/o6genJ2YZrhE0JTr7wl7TqJvvnOHrhS1CTX04qp6Yq/u2y8SYP3wcYxzd00aFI9aAd7vpPSe1GQPdpbY9XEeMQKOkbYDfmIefU/r+WAKiGfJFKMO8PhLsatWRwDaapL3MusqJxk2PyGjfS210yWhSh8ReJRAMCEkRQWiN17KXGlCN/g7SRnmHRAfyo7wsl3mClJunGgKe6i0brWvibcu3/YWaFhdnzpxuxp1Bw0VJgoccQy2JXKzwTa8GhZFFbJ4COMJAsHBsmhAVKW2jRg60IULayQo1QnWwIDAQAB`
+	pubkeyb64 := `pubkey b64 in PKIX MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArIqb6VwlJKjycV2WKHpefsDCKs45JRkBn5+RjV/ik5rr204Uuop1cekSeIdFGXEhTpRotqyfj2MMYcKnAGGeKZC3lj/SwZqvbeL8gh0ZtVKJf+EPhEt1S/DsE74NPPlhuQTFKKhBX/MvfJ3dHvJGErJAGJ01mTlHlJEqdCrR0hdarfBLfdYOoUXFDcDR3TL/FMELW5qJU5Z8agTichZvZDWHUjVK0Cvp4wHpaB0h7kH/aktNPiYMbgOBprRsW7SiefJ4VvDNdI8Ok4f6M+ySx8m0YKeYhCA1djdyDkOIfFKAFVwCC1r/2WxBa5si8aUSo3bm37+yuhoxUKiMfGjnCwIDAQAB`
 
 	decoded, err := base64.StdEncoding.DecodeString(pubkeyb64)
 	if err != nil {
@@ -641,7 +695,7 @@ func Test_b64_pubkey_from_browser(t *testing.T) {
 	fakey := Profile{
 		Id:          Crypter.getPeerIDBase58FromPubkey(foo),
 		Pubkey:      x509.MarshalPKCS1PublicKey(foo),
-		Tip:         "",
+		GraphTip:    "",
 		DisplayName: "Bob",
 		Bio:         "lol",
 		Previous:    nil,
@@ -659,7 +713,7 @@ func Test_b64_pubkey_from_browser(t *testing.T) {
 	t.Log(sEnc)
 
 	//sigB64FromBrowser := `ZQfn0ZKYy2iWY3i/P1V3kUGX2W+/zbmN7R4FkYHZxySqOK/mB/Jifl4kBWGrvNP8tbth8EYWxIV26fqwXwbkw2fHGiN0i+O3AsXNCycr034qzSehdngCYG/Rctzro4Z+JOlCJnguoKGZzuqQQ9Y2UG7kfi8TzuF6o2shgS++aYMSbVX7aw5tQawWE9UsWWJ0gaDJpjsICxf9xr6cFhUJ/V3hEx0ry7+TFBODDTBBnAS/91lFuBKbuR2vkZw7bk21FGyqjGx5bh92NfOc1PJNjqTohGziY+sawCyRvgyPBzIbZzzcD4kqjJmyBBEvHUxcBN5cdvHIkLHT0gyi2nkhwg==`
-	sigB64FromBrowser := `ionmf9msoIovD5b6p4PXTVVQVjxG/lSo7eopCS1GGlHbo5U6RP/SYcJhj6rCjbpU0HtIZacS5hLz7Awb13/aqPzSjxk7miF77vrQ8vYv9S5hempuG7/ASy3WYJ876JFV3PI75fR0s6nBe5qX6wyAtDH3ZCeMnllMOOXGFv+yOY/HNryAvaqFnH5E/MyH91Jl3narxhtPrwC3pW8RGHl9PnBtdMQ4SWnc7vl/ly5oGZfCphKUOGkonUbfcDb958M6njhXuXJaeONpDh3ei+QmQa8hnTuDeWH94VudKlN4CSXhRtnzBiR5ZvMIZzjw9w67A+tZ21jCyGU+WZ3C4ajb/Q==`
+	sigB64FromBrowser := `HQfIVHTvC/RaJ0ot4pPQZiy5+1H8PQDAO2fdP2T+8mkBtfZUGDkYJ3GM1sOLm+4PryDewySfvml3CDWYym7wTflXHVz+hJoyOtbA9lM9//CZ5i4iY0ZsDnIgnX6yX4zdg7jpLfMe0tL9Sv77cSkeKdAblaSZZ2pX4yVZTYQ0X7HxZeKT2/fc37mBREoGCCkUMAoWw6htfXnMuWeHftwXqpC4Z+rmPDsn/h5ER9sLGXLWh3S6RTRHVkhY+uVkcNzxfXm8ASJCSFSnVzYSgA0VHW4temXvGjbGy9Pjw/BFR35hkGF8mbqR16Eykb3RmBFA7NP6wPiaNxLWzVPwzTpYbw==`
 	sigFromBrowser, err := base64.StdEncoding.DecodeString(sigB64FromBrowser)
 	fakey.Signature = sigFromBrowser
 
@@ -670,55 +724,10 @@ func Test_b64_pubkey_from_browser(t *testing.T) {
 	log.Printf("profile: %#v", fakey)
 	t.Logf("byte len of sig: %d", len(sigFromBrowser))
 
+	//i was literally going nuts because i couldnt get the sig to verify. learned the hard way about assumptions once again. in js-land, you feed the data in, not a hash. it does the hashing. here we do the hashing. i neeeded to be sending the unsigned data to the client, not a hash of it.
 	err = rsa.VerifyPSS(foo, crypto.SHA256, profileHash, sigFromBrowser, nil)
 	require.Nil(t, err)
 
-	return
-
-	//i was literally going nuts because i couldnt get the sig to verify. learned the hard way about assumptions once again. in js-land, you feed the data in, not a hash. it does the hashing. here we do the hashing. i neeeded to be sending the unsigned data to the client, not a hash of it.
-
-	msgHash := sha256.New()
-	_, err = msgHash.Write([]byte("potato"))
-	if err != nil {
-		panic(err)
-	}
-	msgHashSum := msgHash.Sum(nil)
-	err = rsa.VerifyPKCS1v15(foo, crypto.SHA256, msgHashSum, sigFromBrowser)
-	require.Nil(t, err)
-	log.Print(err)
-
-	//err = rsa.VerifyPKCS1v15(foo, crypto.SHA256, profileHash, sigFromBrowser)
-	//err = rsa.VerifyPKCS1v15(foo, 0, profileHash, sigFromBrowser)
-	//t.Log(err)
-	//require.Nil(t, err)
-
-	otherkey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.Nil(t, err)
-	dumbsig, err := rsa.SignPKCS1v15(rand.Reader, otherkey, crypto.SHA256, profileHash)
-	require.Nil(t, err)
-	log.Printf("dumbsig b64: %s", base64.StdEncoding.EncodeToString(dumbsig))
-	err = rsa.VerifyPKCS1v15(&otherkey.PublicKey, crypto.SHA256, profileHash, dumbsig)
-	require.Nil(t, err)
-
-	//pubkey, err := x509.ParsePKCS1PublicKey(decoded)
-	// browser built-in stuff wants to use this export format. fine with me, it seems to work just as well.
-	pubkeybytes, err := x509.MarshalPKIXPublicKey(&otherkey.PublicKey)
-	require.Nil(t, err)
-	pubky64 := base64.StdEncoding.EncodeToString(pubkeybytes)
-	log.Printf(pubky64)
-
-	//data := []byte("Eg vil ikkje vaska opp!")
-	//digest := sha256.Sum256(data)
-	//signature, signErr := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, digest[:])
-	//if signErr != nil {
-	//	t.Errorf("Could not sign message:%s", signErr.Error())
-	//}
-	//// just to check that we can survive to and from b64
-	//b64sig := base64.StdEncoding.EncodeToString(signature)
-	//decodedSignature, _ := base64.StdEncoding.DecodeString(b64sig)
-	//// verify part
-	//verifyErr := rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, digest[:], decodedSignature)
-	//require.Nil(t, err)
 }
 
 func Test_b64_privkey_from_browser(t *testing.T) {
@@ -736,11 +745,15 @@ func Test_b64_privkey_from_browser(t *testing.T) {
 	}
 	foo2 := privkey.(*rsa.PrivateKey)
 	peerId := Crypter.getPeerIDBase58FromPubkey(&foo2.PublicKey)
-	IPFS.addPrivKeyIPNSPublish(foo2, peerId, "QmV6j8EmP5ELE1WhjMmfYCfJiBPoU95ENqPFKdonL3Kxxd")
+	require.Equal(t, "Qmc6fkHsvBRaHZjGMVsh8VDoUFjnnUZvAw6uvNRuaeRCGu", peerId)
+	//IPFS.addPrivKeyIPNSPublish(foo2, peerId, "QmV6j8EmP5ELE1WhjMmfYCfJiBPoU95ENqPFKdonL3Kxxd")
 
 }
 
-func Test_http_service(t *testing.T) {
+func _Test_http_service(t *testing.T) {
+	// was using this to test api server but recently seems more convenient to just build/run on cli for that.
+	// the code below that which tests a specific server method input/output could be good example to keep around.
+
 	initializers()
 	service := &APIService{
 		TimeService: &defaultTimeService{},
@@ -768,3 +781,205 @@ func Test_http_service(t *testing.T) {
 
 	//assert.Equal(t, data.expectedStatus, resp.StatusCode, data.jsonBody)
 }
+
+type mockFederationMember struct {
+	list map[string]string
+}
+func (mf *mockFederationMember) ResolveFetch() (map[string]string, error) {
+	return mf.list, nil
+}
+
+func Test_IPNSDelegateFederation(t *testing.T) {
+	timeService := &testTimeService{
+		curTime: JSONTime(time.Now().UTC()),
+		incrementSec: 17,
+	}
+
+	//delegate maps d1, d2
+	d1mockResolverFetcher := mockFederationMember{ list: map[string]string{}}
+	d2mockResolverFetcher := mockFederationMember{ list: map[string]string{}}
+	//mockMember1resolverFetcher := mockFederationMember{ list: map[string]string{}}
+	//d2 := mockFederationMember{ list: map[string]string{}}
+	//_, _ = d1, d2
+
+	fedMember1 := IPNSFederationMember{
+		name: "d1",
+		resolverFetcher: &d1mockResolverFetcher,
+	}
+	fedMember2 := IPNSFederationMember{
+		name: "d2",
+		resolverFetcher: &d2mockResolverFetcher,
+	}
+	_, _ = fedMember1, fedMember2
+
+	timelines := []*Timeline{}
+	for i := 0; i < 4; i++ {
+		tl, err := CreateTimelineWithFirstTextPost(&TLCreateProfileArgs{
+			DisplayName:   fmt.Sprintf("Profile %d", i),
+			Bio:           fmt.Sprintf("Profile %d bio", i),
+			FirstPostText: fmt.Sprintf("Profile %d first post text", i),
+			TimeService:  timeService,
+			IPNSDelegated: true,
+		})
+		require.Nil(t, err)
+		timelines = append(timelines, tl)
+	}
+
+	//create a profile p1 with a few posts history (add 1 post after created so there are 2)
+	t.Logf("p1a id %s profilecid after first post: %s", timelines[0].profile.Id, timelines[0].profile.cid)
+	gn, err := timelines[0].NewTextPostGraphNode("2nd post from p1")
+	require.Nil(t, err)
+	timelines[0].PublishGraphNode(gn)
+	//get cid of profile tip for d1 - p1aN1
+	p1aN1 := timelines[0].profile.cid
+	_ = p1aN1
+
+	//create same profile p1 over again, one post
+	dupTl0, err := CreateTimelineWithFirstTextPost(&TLCreateProfileArgs{
+		DisplayName:   timelines[0].profile.DisplayName,
+		Bio:           timelines[0].profile.Bio,
+		FirstPostText: "Alt timeline for profile 0",
+		TimeService:  timeService,
+		IPNSDelegated: true,
+		PrivateKey: timelines[0].profile.privkey,
+	})
+	p1bN1 := dupTl0.profile.cid
+	require.Nil(t, err)
+	require.Equal(t, dupTl0.profileId, timelines[0].profileId )
+
+	//get alternative profile tip for d2 - p1n1b
+	d1mockResolverFetcher.list[timelines[0].profileId] = p1aN1 //2 history entries
+	d2mockResolverFetcher.list[timelines[0].profileId] = p1bN1 //1 history entries ... same profile id.
+	t.Logf("p1a id %s profilecid after 2nd post: %s", timelines[0].profile.Id, p1aN1)
+	t.Logf("p1b id %s profilecid after first post of alt timeline: %s", dupTl0.profile.Id, p1bN1)
+	//resolve for p1 should return the .... longest history one of competing siblings. aka p1aN1
+
+	//create a 2nd profile p2, only one post, one tip p2n1, put in d1
+	d1mockResolverFetcher.list[timelines[1].profileId] = timelines[1].profile.cid
+	t.Logf("p2 id %s profilecid after first and only post: %s", timelines[1].profile.Id, timelines[1].profile.cid)
+	//resolve for p2 should give p2n1
+
+	//create a 3rd profile, p3, only one tip but 3 message history.
+	p3rootProfileCid := timelines[2].profile.cid
+	gn, err = timelines[2].NewTextPostGraphNode("2nd post from p3")
+	require.Nil(t, err)
+	timelines[2].PublishGraphNode(gn)
+	gn, err = timelines[2].NewTextPostGraphNode("3rd post from p3")
+	require.Nil(t, err)
+	timelines[2].PublishGraphNode(gn)
+
+	//put real tip p3n3 into d1 one delegate map
+	//skip previous 1 (skip p3n2)
+	//put origin p3n1 into d2
+	d1mockResolverFetcher.list[timelines[2].profileId] = timelines[2].profile.cid
+	d2mockResolverFetcher.list[timelines[2].profileId] = p3rootProfileCid
+	t.Logf("p3 id %s profilecid after 1st post of only timeline: %s", timelines[2].profile.Id, p3rootProfileCid)
+	t.Logf("p3 id %s profilecid after 3rd post of only timeline: %s", timelines[2].profile.Id, timelines[2].profile.cid)
+	//resolve for p3 should give p3n3 (and should discard p3n1 only after walking history)
+
+	//create a 4th profile, p4, only one tip but 2 message history.
+	p4rootProfileCid := timelines[3].profile.cid
+	gn, err = timelines[3].NewTextPostGraphNode("2nd post from p4")
+	require.Nil(t, err)
+	timelines[3].PublishGraphNode(gn)
+
+	//put real tip p4n2 into d1 one delegate map
+	//put previous p4n1 into d2
+	d1mockResolverFetcher.list[timelines[3].profileId] = timelines[3].profile.cid
+	d2mockResolverFetcher.list[timelines[3].profileId] = p4rootProfileCid
+	t.Logf("p4 id %s profilecid after 1st post of only timeline: %s", timelines[3].profile.Id, p4rootProfileCid)
+	t.Logf("p4 id %s profilecid after 2nd post of only timeline: %s", timelines[3].profile.Id, timelines[3].profile.cid)
+
+	//resolve should give p4n2 and chuck p4n1 due to p4n2 content directly referring to it.
+
+
+	want := []string{
+		p1aN1, // first profile, with the 2 alt timelines, s.b. getting the cid of profiletip of the 'longest' one.
+		timelines[1].profile.cid, //2nd profile, only one post no alt timelines.
+		timelines[2].profile.cid, // 3rd profile, has 3 entry history, but we put an old one into one of the fedmember lists. should get this new one.
+		timelines[3].profile.cid, // 4th profile just two entries. should be able to chuck baddy from choices without walking full history but i might just do the walk.
+	}
+	_ = want
+
+	//create two ipnsdelegate maps, one mentioning each
+	//add the 2nd guy to one of the delegate lists
+	//make a mock that when it takes in request for delegateipns1, gives out the one cid
+	//make a mock that when it takes in request for delegateipns2, gives out the other cid
+
+	//instantiate the thing that will resolve this stuff using both of those delegateipns1 and delegateipns2 as the entirety of the federation.
+	testFederation := IPNSDelegateFederation{
+		Members : []IPNSFederationMember{ fedMember1, fedMember2 },
+	}
+	testFederation.ExperimentalInit()
+
+	for i, e := range timelines {
+		wantHere := want[i]
+		got := testFederation.Get(e.profileId)
+		assert.Equal(t, wantHere, *got )
+	}
+
+	//ask it to get the profiletip for p1, p2, p3, p4
+	//check results are as expected from description above.
+
+}
+func TestIPNSDelegateSlam(t *testing.T) {
+
+	timeService := &testTimeService{
+		curTime: JSONTime(time.Now().UTC()),
+		incrementSec: 17,
+	}
+
+	profiles := []*TLProfile{}
+	for i := 0; i < 10; i++ {
+		tl, err := CreateTimelineWithFirstTextPost(&TLCreateProfileArgs{
+			DisplayName:   fmt.Sprintf("Profile %d", i),
+			Bio:           fmt.Sprintf("Profile %d bio", i),
+			FirstPostText: fmt.Sprintf("Profile %d first post text", i),
+			TimeService:  timeService,
+			IPNSDelegated: true,
+		})
+		require.Nil(t, err)
+		profiles = append(profiles, tl.profile)
+	}
+
+	allpubStart := time.Now()
+	var wg sync.WaitGroup
+	wg.Add(len(profiles))
+	for _, profile := range profiles {
+		go func(profile *TLProfile) {
+			defer wg.Done()
+			IPFS.updateDelegateEntry(profile.Profile, profile.cid)
+		}(profile)
+		//go wgIPNSPublisher(&wg, profile)
+	}
+	wg.Wait()
+	t.Logf("%d tip updates Completed in %.2f sec", len(profiles), time.Since(allpubStart).Seconds())
+
+	allresolveStart := time.Now()
+	wg.Add(len(profiles))
+	for _, profile := range profiles {
+		wgTipLookerUpper(t, &wg, profile)
+	}
+	wg.Wait()
+	t.Logf("%d tip lookups Completed in %.2f sec", len(profiles), time.Since(allresolveStart).Seconds())
+
+}
+func wgIPNSPublisher(wg *sync.WaitGroup, tlProfile *TLProfile) {
+	defer wg.Done()
+	return
+
+	log.Printf("doing %s ipns update with %s...\n", tlProfile.DisplayName, tlProfile.cid)
+	profileIPNS := IPFS.publishIPNSUpdate(tlProfile.cid, tlProfile.Id)
+	log.Printf("%s ipns: %s\n", tlProfile.Id, profileIPNS)
+}
+func wgTipLookerUpper(t *testing.T, wg *sync.WaitGroup, tlProfile *TLProfile) {
+	defer wg.Done()
+	log.Printf("doing %s ipns lookup with %s...\n", tlProfile.DisplayName, tlProfile.cid)
+	//profileTipCid, err := IPFS.resolveIPNS(tlProfile.cid)
+	profileTipCid, err := IPFS.determineProfileCid(tlProfile.Id)
+	require.Nil(t, err)
+	require.NotNil(t, profileTipCid)
+	log.Printf("profileId %s got tip %s\n", tlProfile.Id, *profileTipCid)
+}
+
+

@@ -34,23 +34,30 @@ Below are using example paths for the project and go resource directories. You w
 
 Start IPFS node:
     
-    
     cd /home/blademccool/ciddag/;
     COMPOSE_FILE=docker-compose.base.yml docker-compose up -d ipfs0
 
 Build:
- 
 
     cd /home/blademccool/ciddag/src;
     GOROOT=/home/blademccool/sdk/go1.15.6 GOPATH=/home/blademccool/go /home/blademccool/sdk/go1.15.6/bin/go get -u ./...;
     GOROOT=/home/blademccool/sdk/go1.15.6 GOPATH=/home/blademccool/go /home/blademccool/sdk/go1.15.6/bin/go build -i -o ciddag .  
 
 Run: 
- 
 
     CIDDAG_HTTP_PORT=4589 CIDDAG_IPFS_API_SERVER=localhost:7767 CIDDAG_IPFS_KEYSTORE_PATH=./compose/ipfs2/keystore CIDDAG_WL_PROFILEIDS="QmQPy3enk6rHvumMT1u2bnNCEr4QoBiqU2EHXaRUVxmw5p,Qmd7Scc5K1B8JLNoMS4cKATQKemAoSaEq7nFc5b3oQ9F3M" ./ciddag 
 
+Symlink for project code in go: If there are issues building, please try creating a symlink for the name the project is using internally in your gopath src dir, and then attempt the build again.
+    
+    eg: ln -s /path/to/project/src /yourgopath/src/github.com/blademccool/ciddag
  
+
+Re-Bundling js (if desired):
+
+    cd /home/blademccool/ciddag/web
+    browserify peerutil.js -r -s peerutil -o lib/peerutil.bundle.js
+    
+    
  
 ### TODOs / ideas for the future   
  - Improve UI, ux, layout/design etc as well as the possibility to make use of the js-ipfs library to load cid data and move timeline assembly code from the server to the browser, which could make the experience much more dynamic!  
@@ -64,7 +71,7 @@ Run:
   
  - Likes - which by the nature of the system would only be able to count up a total of likes done to your content by people in your social graph.  
   
- - Groups - likely requiring new data structure. Havent put too much thought into it but a hierarchy of profileIds could have authority to publish the canonical offical history of a given group, thus allowing them moderation power to disappear posts in the group as desired.  
+ - Groups / "Curated Feeds" - likely requiring new data structure. Havent put too much thought into it but a hierarchy of profileIds could have authority to publish the canonical offical history of a given group, thus allowing them moderation power to disappear posts in the group as desired.  
   
  - Blacklisting services with blacklist of post content cids. Multiple blacklists could be subscribed to, it would just put all the cids on one master block list. Could manually exclude things of interest if the subscribed block lists are too agressive.  
   

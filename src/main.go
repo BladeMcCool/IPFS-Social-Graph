@@ -17,16 +17,36 @@ func main() {
 		BaseWlProfileIds: map[string]bool{},
 		WlProfileIdMutex: sync.RWMutex{},
 		ListenPort: getServiceHttpListenPort(),
+		BaseWlProfileIdList: getWlBaseProfileIdList(),
 	}
 	initializers()
 	go IPFS.StartIPNSPeriodicUpdater()
-	go service.setupWl(getWlBaseProfileIdList())
+	go service.setupWl()
+	go func() {
+		//these are each going to do IPNS stuff so dont want them running concurrently. (just seems to lead to context timeouts)
+		Federation.Init()
+		service.setupExtendedWl()
+		Federation.RunBackgroundUpdateFetcherProcessor()
+	}()
 	service.Start()
 }
 
 func initializers() {
 	IPFS.InitProfileCache()
 	Trash.prepareDumpsterToReceiveTrash()
+
+	IPNSDelegateName := IPFS.getIPNSDelegateName()
+	Federation = IPNSDelegateFederation{
+		ipnsName: *IPNSDelegateName,
+		memberNames: getIPNSFederationMembernames(),
+		ipfs: IPFS,
+		IPNSDelegatedProfileCids: map[string]string{},
+	}
+
+}
+var UtilityTimeline = &Timeline{
+	crypter: Crypter,
+	ipfs: IPFS,
 }
 
 var IPFS = &IPFSCommunicator{
@@ -34,7 +54,7 @@ var IPFS = &IPFSCommunicator{
 	IPNSDelegateKeyName: "ipnsdelegate2",
 }
 var Crypter = &CryptoUtil{
-	keystorePath: getIpfsKeystorePath(),
+	ipfsKeystorePath: getIpfsKeystorePath(),
 }
 var Trash = &Trashcan{}
 
@@ -57,8 +77,8 @@ func getIpfsKeystorePath() string {
 		log.Printf("CIDDAG_IPFS_KEYSTORE_PATH specified path %s does not exist", val)
 		os.Exit(1)
 	}
-	if string(val[len(val)-1]) != "/" {
-		val = val + "/"
+	if string(val[len(val)-1]) == "/" {
+		val = val[:len(val)-1]
 	}
 	return val
 }
@@ -72,6 +92,16 @@ func getWlBaseProfileIdList() []string {
 	if val == "" { return nil }
 	return strings.Split(val, ",")
 }
+
+func getIPNSFederationMembernames() []string {
+	val, ok := os.LookupEnv("CIDDAG_IPNS_FEDERATIONMEMBERS")
+	if !ok {
+		return nil
+	}
+	if val == "" { return nil }
+	return strings.Split(val, ",")
+}
+
 func getServiceHttpListenPort() string {
 	val, ok := os.LookupEnv("CIDDAG_HTTP_PORT")
 	if !ok {
@@ -79,13 +109,6 @@ func getServiceHttpListenPort() string {
 		os.Exit(1)
 	}
 	return val
-}
-
-func removeLocalFile(fileName string) {
-	e := os.Remove(fileName)
-	if e != nil {
-		log.Fatal(e)
-	}
 }
 
 func checkError(err error) {

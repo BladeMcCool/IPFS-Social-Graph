@@ -20,15 +20,13 @@ import (
 )
 
 type CryptoUtil struct {
-	keystorePath string
+	ipfsKeystorePath string
 }
 
 func (cu *CryptoUtil) makeKey(fileName string) *rsa.PrivateKey {
-	//panic("dont do it again fool")
-	rando := rand.Reader
-	key, err := rsa.GenerateKey(rando, 2048)
+	key, err := cu.genKey()
 	if err != nil {
-		panic("lel")
+		panic("cannot generate rsa key")
 	}
 	//pubkey := key.PublicKey
 	//fmt.Printf("%#v", pubkey)
@@ -37,6 +35,12 @@ func (cu *CryptoUtil) makeKey(fileName string) *rsa.PrivateKey {
 	fmt.Println("Public key: ", key.PublicKey)
 	return key
 }
+func (cu *CryptoUtil) genKey() (*rsa.PrivateKey, error) {
+	//panic("dont do it again fool")
+	rando := rand.Reader
+	return rsa.GenerateKey(rando, 2048)
+}
+
 func (cu *CryptoUtil) makeMsgHashSum(msg []byte) []byte{
 	msgHash := sha256.New()
 	_, err := msgHash.Write(msg)
@@ -97,9 +101,10 @@ func (cu *CryptoUtil)  readKey(fileName string) *rsa.PrivateKey {
 }
 
 func (cu *CryptoUtil)  readBinaryIPFSRsaKey(fileName string) *rsa.PrivateKey {
-	privateKeyFile, err := os.Open(fileName)
+	privateKeyFile, err := os.Open(cu.ipfsKeystorePath + "/" + fileName)
 	if err != nil {
 		fmt.Println(err)
+		//TODO probably should return an error instead.
 		os.Exit(1)
 	}
 
@@ -133,14 +138,14 @@ func (cu *CryptoUtil)  writeBinaryIPFSRsaKey(privkey *rsa.PrivateKey, fileName s
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(fileName, protobytes, 0644)
+	err = ioutil.WriteFile(cu.ipfsKeystorePath + "/" + fileName, protobytes, 0644)
 	return err
 }
 
 func (cu *CryptoUtil)  getIPFSNameFromBinaryRsaKey(fileName string) string {
 	// was referring to https://stackoverflow.com/questions/51433889/is-it-possible-to-derive-an-ipns-name-from-an-ipfs-keypair-without-publishing for some of this.
 	// but i left out the code that would fall back to a mh.ID algo if the data was too short b/c the data is never going to be that short for these.
-	privateKeyFile, err := os.Open(fileName)
+	privateKeyFile, err := os.Open(cu.ipfsKeystorePath + "/" + fileName)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

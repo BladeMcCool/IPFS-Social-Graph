@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rsa"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/ReneKroon/ttlcache"
@@ -33,7 +32,7 @@ func (ic *IPFSCommunicator) getIPNSDelegateName() *string {
 	//i imagine that the entries in the delegated lookup page will be a map[profileid]latestcidAndsignature
 	//keyname := "ipnsdelegate"
 	_ = ic.makeKeyInIPFS(ic.IPNSDelegateKeyName)
-	ipfsName := Crypter.getIPFSNameFromBinaryRsaKey(Crypter.keystorePath + ic.IPNSDelegateKeyName)
+	ipfsName := Crypter.getIPFSNameFromBinaryRsaKey(ic.IPNSDelegateKeyName)
 	log.Printf("getIPNSDelegateName: determined a name of %s", ipfsName)
 	return &ipfsName
 }
@@ -52,8 +51,8 @@ func (ic *IPFSCommunicator) addContentToIPFS(data []byte) string {
 func (ic *IPFSCommunicator) publishIPNSUpdate(cid, keyName string) string {
 	log.Printf("publishIPNSUpdate: starting for profileId %s -> %s", keyName, cid)
 	start := time.Now()
-	keyFileName := Crypter.keystorePath + keyName
-	var expectName = Crypter.getIPFSNameFromBinaryRsaKey(keyFileName)
+	//keyFileName := Crypter.keystorePath + keyName
+	var expectName = Crypter.getIPFSNameFromBinaryRsaKey(keyName)
 	log.Printf("publishIPNSUpdate: new value for key %s / peer id %s: %s", keyName, expectName, cid)
 	resp, err := ic.shell.PublishWithDetails("/ipfs/"+ cid, keyName, time.Hour * 100, time.Second * 60, false)
 	if err != nil {
@@ -72,16 +71,6 @@ func (ic *IPFSCommunicator) publishIPNSUpdate(cid, keyName string) string {
 }
 
 func (ic *IPFSCommunicator) checkCachedProfileIds(profileId string) (string, bool) {
-	//cacheMutex.RLock()
-	//defer cacheMutex.RUnlock()
-	////TODO .... LRU ? expiry of entries ?? if someone updated thru us and then thru anotehr server we would never see the update b/c we'd think our cached one was legit.
-	//// ... so probably having this stuff expire at some point will be better than using a straight map that never goes away until the server shuts off.
-	//// and perhaps bootstrap server with last version of this and maybe some stuff isnt expired
-	//if profileCid, found := CacheProfileCids[profileId]; found {
-	//	return profileCid, true
-	//	log.Printf("checkCachedProfileIds: profileId %s had a record in the cache: profileCid %s", profileId, profileCid)
-	//}
-	//log.Printf("checkCachedProfileIds: %s and %#v", profileId, CacheProfileCids)
 	if profileCid, exists := CacheProfileCids.Get(profileId); exists == true {
 		log.Printf("checkCachedProfileIds: profileId %s had a record in the cache: profileCid %s", profileId, profileCid)
 		return profileCid.(string), true
@@ -91,16 +80,10 @@ func (ic *IPFSCommunicator) checkCachedProfileIds(profileId string) (string, boo
 	return "", false
 }
 func (ic *IPFSCommunicator) checkDelegatedIPNS(profileId string) (string, bool) {
-	//IPNSDelegateName := ic.getIPNSDelegateName()
-	//currentList, err := ic.getCurrentDelegatedProfileCids(*IPNSDelegateName)
-	//if err != nil {
-	//	return "", err
-	//}
-	delegateIPNSMutex.RLock()
-	defer delegateIPNSMutex.RUnlock()
-	if profileCid, found := IPNSDelegatedProfileCid[profileId]; found {
-		log.Printf("checkDelegatedIPNS: profileId %s had a record in the delegated mapping: profileCid %s", profileId, profileCid)
-		return profileCid, true
+	profileCid := Federation.Get(profileId)
+	if profileCid != nil {
+		log.Printf("checkDelegatedIPNS: profileId %s had a record in the delegated mapping: profileCid %s", profileId, *profileCid)
+		return *profileCid, true
 	}
 	log.Printf("checkDelegatedIPNS: profileId %s does not have a record in the delegated mapping.", profileId)
 	return "", false
@@ -113,39 +96,34 @@ func (ic *IPFSCommunicator) resolveIPNS(cid string) (string, error) {
 	return result, err
 }
 
-//type delegatedProfileCid map[string]string
-func (ic *IPFSCommunicator) getCurrentDelegatedProfileCids(delegatedIPNSName string) (map[string]string, error) {
-	start := time.Now()
-	log.Printf("getCurrentDelegatedProfileCids ...")
-	currentListCid, err := ic.resolveIPNS(delegatedIPNSName)
-	if err != nil && err.Error() != "name/resolve: context deadline exceeded" {
-		log.Println(err)
+func (ic *IPFSCommunicator) determineProfileCid(profileId string) (*string, error){
+	var err error
+	foundProfileCid, cached := ic.checkCachedProfileIds(profileId)
+	log.Printf("determineProfileCid found %s in cached list? %t", profileId, cached)
+	if cached {
+		return  &foundProfileCid, nil
+	}
+
+	foundProfileCid, delegated := ic.checkDelegatedIPNS(profileId)
+	log.Printf("determineProfileCid found %s in delegated list? %t", profileId, delegated)
+	if delegated {
+		return  &foundProfileCid, nil
+	}
+
+	foundProfileCid, err = ic.resolveIPNS(profileId)
+	foundInIpns := err == nil && foundProfileCid != ""
+	log.Printf("determineProfileCid found %s in ipns? %t", profileId, foundInIpns)
+	if err != nil {
 		return nil, err
 	}
-	log.Printf("getCurrentDelegatedProfileCids took %.2f sec to get delegatedIPNS profile list.", time.Since(start).Seconds())
-
-	currentList := map[string]string{}
-	if currentListCid != "" {
-		currentListBytes, err := ic.getCidFileBytes(currentListCid)
-		if currentListBytes == nil {
-			log.Printf("actually got nothing for currentListBytes which shouldnt be a problem but ...")
-		}
-
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		err = json.Unmarshal(currentListBytes, &currentList)
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-	} else {
-		log.Printf("current list appears to not exist (no cid from ipns, so create new)")
+	if foundProfileCid == "" {
+		return nil, fmt.Errorf("determineProfileCid: unable to determine for profileId %s", profileId)
 	}
-	log.Printf("getCurrentDelegatedProfileCids took %.2f sec to complete", time.Since(start).Seconds())
-	return currentList, nil
+	return &foundProfileCid, nil
 }
+
+//type delegatedProfileCid map[string]string
+
 
 func (ic *IPFSCommunicator) getCidFileBytes(cid string) ([]byte, error) {
 	start := time.Now()
@@ -176,11 +154,16 @@ func (ic *IPFSCommunicator) getCidFileBytes(cid string) ([]byte, error) {
 	return bs, nil
 }
 
+//type TipUpdate struct {
+//	ProfileId string
+//	ProfileCid string
+//	Time time.Time
+//	//Signature string /// ? dunno if really needed - we would only
+//}
 
-var delegateIPNSMutex sync.RWMutex
+
 var nonDelegateIPNSMutex sync.RWMutex
 //var cacheMutex sync.RWMutex
-var IPNSDelegatedProfileCid = map[string]string{}
 var IPNSProfileCids = map[string]string{}
 //var CacheProfileCids = map[string]string{}
 var CacheProfileCids *ttlcache.Cache
@@ -189,17 +172,13 @@ var CacheProfileCids *ttlcache.Cache
 //CacheProfileCids.SetTTL(time.Duration(24 * time.Hour))
 
 func (ic *IPFSCommunicator) updateCacheEntry(profile *Profile, profileCid string) {
-	//cacheMutex.Lock()
-	//defer cacheMutex.Unlock()
-	//CacheProfileCids[profile.Id] = profileCid
+	// I believe we should ONLY cache these when the update is made through our server.
 	CacheProfileCids.Set(profile.Id, profileCid)
 	log.Printf("updateCacheEntry for %s, profile id %s to new profile cid %s", profile.DisplayName, profile.Id, profileCid)
 }
 
 func (ic *IPFSCommunicator) updateDelegateEntry(profile *Profile, profileCid string) {
-	delegateIPNSMutex.Lock()
-	defer delegateIPNSMutex.Unlock()
-	IPNSDelegatedProfileCid[profile.Id] = profileCid
+	Federation.Set(profile.Id, profileCid)
 	log.Printf("updateDelegateEntry for %s, profile id %s to new profile cid %s", profile.DisplayName, profile.Id, profileCid)
 }
 func (ic *IPFSCommunicator) updateNonDelegateEntry(profile *Profile, profileCid string) {
@@ -209,13 +188,7 @@ func (ic *IPFSCommunicator) updateNonDelegateEntry(profile *Profile, profileCid 
 	nonDelegateIPNSMutex.Unlock()
 
 	//also get rid of any reference to the profile id in the delegated map so that we dont keep using it for things that have asked us to do ipns for them.
-	delegateIPNSMutex.Lock()
-	if _, found := IPNSDelegatedProfileCid[profile.Id]; found {
-		delete(IPNSDelegatedProfileCid, profile.Id)
-	}
-	IPNSProfileCids[profile.Id] = profileCid
-	delegateIPNSMutex.Unlock()
-
+	Federation.Del(profile.Id)
 	log.Printf("updateNonDelegateEntry for %s, profile id %s to new profile cid %s", profile.DisplayName, profile.Id, profileCid)
 }
 
@@ -223,48 +196,25 @@ func (ic *IPFSCommunicator) addPrivKeyIPNSPublish(key *rsa.PrivateKey, profileId
 	//rename this func later.
 	//basically, go take that private key,
 	//turn it into a key in the file system
-	Crypter.writeBinaryIPFSRsaKey(key, Crypter.keystorePath + profileId)
+	Crypter.writeBinaryIPFSRsaKey(key, profileId)
 	//that ipfs can use,
 	//and then use it to publish a name update.
 	ic.publishIPNSUpdate(profileCid, profileId)
 }
 
-func (ic *IPFSCommunicator) publishDelegatedIPNSUpdate() {
-	log.Println("publishDelegatedIPNSUpdate ...")
-	//currentList, err := ic.getCurrentDelegatedProfileCids(*profile.IPNSDelegate)
-	//if err != nil {
-	//	log.Print(err)
-	//	return
-	//}
-	//log.Printf("current list: %#v", currentList)
-	delegateIPNSMutex.RLock()
-	updatedListBytes, err := json.Marshal(IPNSDelegatedProfileCid)
-	delegateIPNSMutex.RUnlock()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	updatedListCid := ic.addContentToIPFS(updatedListBytes)
-	ipnsname := ic.publishIPNSUpdate(updatedListCid, ic.IPNSDelegateKeyName)
-	//log.Printf("ipns update for profileid %s with profile tip cid of %s complete -- got new master dict cid of %s (using delegated ipns %s)", profile.Id, profileCid, updatedListCid, ipnsname)
-	log.Printf("ipns update for delegates complete -- got new master dict cid of %s (using delegated ipns %s)", updatedListCid, ipnsname)
-}
 
 func (ic *IPFSCommunicator) InitProfileCache() {
 	CacheProfileCids = ttlcache.NewCache()
 	CacheProfileCids.SetTTL(24 * time.Hour)
 }
 func (ic *IPFSCommunicator) StartIPNSPeriodicUpdater() {
-	var err error
-
-	IPNSDelegateName := ic.getIPNSDelegateName()
-	delegateIPNSMutex.RLock()
-	currentDelegatedProfileCids, err := ic.getCurrentDelegatedProfileCids(*IPNSDelegateName)
-	if err != nil || currentDelegatedProfileCids == nil {
-		IPNSDelegatedProfileCid = map[string]string{}
-	}
-	log.Printf("IPNSDelegatedProfileCid of delegated profile and their tip cids on startup: %#v", IPNSDelegatedProfileCid)
-	delegateIPNSMutex.RUnlock()
+	//delegateIPNSMutex.RLock()
+	//currentDelegatedProfileCids, err := ic.getCurrentDelegatedProfileCids(*IPNSDelegateName)
+	//if err != nil || currentDelegatedProfileCids == nil {
+	//	IPNSDelegatedProfileCid = map[string]string{}
+	//}
+	//log.Printf("IPNSDelegatedProfileCid of delegated profile and their tip cids on startup: %#v", IPNSDelegatedProfileCid)
+	//delegateIPNSMutex.RUnlock()
 
 	minCycleTimeSec := float64(90)
 	for {
@@ -277,7 +227,7 @@ func (ic *IPFSCommunicator) StartIPNSPeriodicUpdater() {
 		ipnsUpdatesCount++
 		go func(wg *sync.WaitGroup){
 			defer wg.Done()
-			ic.publishDelegatedIPNSUpdate()
+			Federation.publishDelegatedIPNSUpdate()
 		}(&wg)
 
 		nonDelegateIPNSMutex.RLock()

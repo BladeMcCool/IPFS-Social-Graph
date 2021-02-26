@@ -33,13 +33,23 @@
           <button onclick="renameSelectedIdentity()">Rename Identity</button>&nbsp;
         </p>
 
-        <p>Public Key base64:&nbsp;<textarea id="pubkeyb64" name="pubkeyb64" disabled></textarea></p>
-        <p>Private Key base64:&nbsp;<textarea id="privkeyb64" name="privkeyb64" disabled></textarea></p>
-        <!-- <p>Both keys, custom PEM format:&nbsp;<textarea id="pemishout" name="pemishout" disabled></textarea></p> -->
-        <p>Profile Id:&nbsp;<input type="text" id="profileid" name="profileid" size="50" disabled></p>
-        <p>Profile Tip:&nbsp;<input type="text" id="profiletip" name="profiletip" size="50" disabled></p>
-        <p>Graph Tip:&nbsp;<input type="text" id="graphtip" name="graphtip" size="50" disabled></p>
-        <p>IPNSDelegate&nbsp;<input type="text" id="ipnsdelegate" name="ipnsdelegate" size="50" disabled></p>
+        <span id="importprivkeyb64_container" style="display: none">
+          <p>Private Key for Import base64:&nbsp;
+            <textarea id="importprivkeyb64" name="importprivkeyb64"></textarea>
+            <button onclick="importKeyAsIdentity()">Import Private Key as Identity</button>&nbsp;
+          </p>
+        </span>
+
+
+        <span id="currentprofile_detail">
+          <p>Public Key base64:&nbsp;<textarea id="pubkeyb64" name="pubkeyb64" disabled></textarea></p>
+          <p>Private Key base64:&nbsp;<textarea id="privkeyb64" name="privkeyb64" disabled></textarea></p>
+          <!-- <p>Both keys, custom PEM format:&nbsp;<textarea id="pemishout" name="pemishout" disabled></textarea></p> -->
+          <p>Profile Id:&nbsp;<input type="text" id="profileid" name="profileid" size="50" disabled></p>
+          <p>Profile Tip:&nbsp;<input type="text" id="profiletip" name="profiletip" size="50" disabled></p>
+          <p>Graph Tip:&nbsp;<input type="text" id="graphtip" name="graphtip" size="50" disabled></p>
+          <p>IPNSDelegate&nbsp;<input type="text" id="ipnsdelegate" name="ipnsdelegate" size="50" disabled></p>
+        </span>
         <hr>
         <!-- if you feel inspired to implement the stuff the server does in js using ipfs-js, i'd welcome a pr. ipns publish doesnt seem to work from the browser tho, which is kind of the primary motivation behind the server thing in the first place. -->
         <p>Service Base Url :&nbsp;<input type="text" id="servicebaseurl" name="servicebaseurl" size="50" onblur="saveServiceBaseUrl()"></p>

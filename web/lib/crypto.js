@@ -55,10 +55,11 @@ function arrayBufferToBase64String(arrayBuffer) {
     return btoa(arrayBufferToString(arrayBuffer))
 }
 
-async function derivePubkeyFromPrivkey() {
-
-    ident = identities[selectedIdentity]
-    privkey = await window.crypto.subtle.importKey('pkcs8', base64StringToArrayBuffer(ident["priv"]), signAlgorithm, true, ["sign"])
+async function derivePubkeyFromPrivkey(privkeyB64) {
+    //experiment to figure out how we can get pubkey from privkey in JS, leadup to being able to import an identity
+    // ident = identities[selectedIdentity]
+    // privkey = await window.crypto.subtle.importKey('pkcs8', base64StringToArrayBuffer(ident["priv"]), signAlgorithm, true, ["sign"])
+    privkey = await window.crypto.subtle.importKey('pkcs8', base64StringToArrayBuffer(privkeyB64), signAlgorithm, true, ["sign"])
 
     // https://stackoverflow.com/a/57571350 (Generate Public key from Private Key using WebCrypto API)
     intermediaryJwk = await crypto.subtle.exportKey("jwk", privkey);
@@ -75,9 +76,9 @@ async function derivePubkeyFromPrivkey() {
     pubExportedBytes = await window.crypto.subtle.exportKey('spki', pubkey)
     pubExportedB64 = arrayBufferToBase64String(pubExportedBytes)
 
-    result = pubExportedB64 == ident["pub"]
+    // result = pubExportedB64 == ident["pub"]
     //should log true.
-    console.log(result)
-    console.log(pubExportedB64)
-    return result
+    // console.log(result)
+    // console.log(pubExportedB64)
+    return pubExportedB64
 }

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gosimple/slug"
 	"log"
 	"sort"
 	"strings"
@@ -31,8 +30,9 @@ type TLProfile struct {
 	privkey *rsa.PrivateKey
 	timeline *Timeline
 	cid string //cid where this particular incarnation of the profile was found (note, these change but profileIds do not)
-	ipfsKeyName string //the name of the key file in the keystore that ipfs creates for us.
+	//ipfsKeyName string //the name of the key file in the keystore that ipfs creates for us. --- update durr that should be its peerid derived from pubkey ... so no.
 	follows map[string]*TLProfile
+	previousProfileNode *TLProfile
 }
 
 type TLCreateProfileArgs struct {
@@ -40,6 +40,8 @@ type TLCreateProfileArgs struct {
 	Bio string
 	FirstPostText string
 	TimeService TimeService
+	IPNSDelegated bool
+	PrivateKey *rsa.PrivateKey
 }
 
 type TimeService interface {
@@ -60,7 +62,7 @@ type Timeline struct {
 	ipnsDelegated bool
 }
 
-func CreateTimelineWithFirstTextPost(createArgs *TLCreateProfileArgs, publishIPNS bool) (*Timeline, error) {
+func CreateTimelineWithFirstTextPost(createArgs *TLCreateProfileArgs) (*Timeline, error) {
 	tl := &Timeline{
 		crypter: Crypter,
 		ipfs: IPFS,
@@ -70,7 +72,7 @@ func CreateTimelineWithFirstTextPost(createArgs *TLCreateProfileArgs, publishIPN
 		log.Printf("using default time service")
 		tl.timeService = &defaultTimeService{}
 	}
-	err := tl.CreateProfileWithFirstTextPost(createArgs, publishIPNS)
+	err := tl.CreateProfileWithFirstTextPost(createArgs)
 	return tl, err
 }
 
@@ -85,18 +87,27 @@ func (tl *Timeline) NewTLGraphNode() *TlGraphNode {
 }
 
 
-func (tl *Timeline) CreateProfileWithFirstTextPost(createArgs *TLCreateProfileArgs, publishIPNS bool) (error) {
-	ipfsKeyName := slug.Make(createArgs.DisplayName)
-	err := tl.ipfs.makeKeyInIPFS(ipfsKeyName)
-	log.Printf("key/gen: key with name '%s' already exists", ipfsKeyName)
-	if err != nil && err.Error() != fmt.Sprintf("key/gen: key with name '%s' already exists", ipfsKeyName) {
-		gg := err.Error()
-		_ = gg
-		panic(err)
+func (tl *Timeline) CreateProfileWithFirstTextPost(createArgs *TLCreateProfileArgs) (error) {
+
+	//var privateKey *rsa.PrivateKey
+	var err error
+	privateKey := createArgs.PrivateKey
+	if privateKey == nil {
+		privateKey, err = tl.crypter.genKey()
+	}
+	tl.profileId = tl.crypter.getPeerIDBase58FromPubkey(&privateKey.PublicKey)
+	if !createArgs.IPNSDelegated {
+		//ipfsKeyName := slug.Make(createArgs.DisplayName)
+		//err := tl.ipfs.makeKeyInIPFS(ipfsKeyName)
+		//log.Printf("key/gen: key with name '%s' already exists", ipfsKeyName)
+		err = Crypter.writeBinaryIPFSRsaKey(privateKey, tl.profileId)
+		if err != nil {
+			return err
+		}
+		//privateKey = tl.crypter.readBinaryIPFSRsaKey(ipfsKeyName)
 	}
 
-	privateKey := tl.crypter.readBinaryIPFSRsaKey(Crypter.keystorePath + ipfsKeyName)
-	tl.profileId = tl.crypter.getPeerIDBase58FromPubkey(&privateKey.PublicKey)
+	//tl.profileId = tl.crypter.getPeerIDBase58FromPubkey(&privateKey.PublicKey)
 
 	//graphNodeCid := tl.publishTextPostGraphNode(privateKey, &createArgs.FirstPostText, nil, nil, nil)
 
@@ -111,20 +122,20 @@ func (tl *Timeline) CreateProfileWithFirstTextPost(createArgs *TLCreateProfileAr
 	profile := tl.createSignedProfile(privateKey, createArgs.DisplayName, createArgs.Bio, graphNodeCid, nil)
 	profileCid := tl.publishProfileToIPFS(profile)
 
-	tl.profileId = profile.Id
+	//tl.profileId = profile.Id
 	tl.history = []*TlGraphNode{}
 	tl.profile = &TLProfile{
 		Profile: profile,
-		ipfsKeyName: ipfsKeyName,
 		pubkey: &privateKey.PublicKey,
 		privkey: privateKey,
 		cid: profileCid,
 		timeline: tl,
 	}
 
-	if publishIPNS {
+	if !createArgs.IPNSDelegated {
 		//this is a blocking slow operation right now, so maybe avoid unless really desired.
-		tl.ipfs.publishIPNSUpdate(profileCid, tl.profile.ipfsKeyName)
+		//or put it in a goroutine if we are doing this. i dont think realisitcally we can be doing this so probably eventually will remove.
+		tl.ipfs.publishIPNSUpdate(profileCid, tl.profile.Id)
 	}
 
 	return nil
@@ -139,14 +150,14 @@ func (tl *Timeline) NewTextPostGraphNode(postText string) (*TlGraphNode, error) 
 
 func (tl *Timeline) PublishGraphNode(graphNode *TlGraphNode) (string, error) {
 	//sign it, publish it, update profile tip, sign profile, publish profile update, return the cid of the new graphnode we did it all for
-	graphNode.SetPrevious(tl.profile.Tip)
+	graphNode.SetPrevious(tl.profile.GraphTip)
 	graphNode.Sign(tl.profile.privkey, tl.crypter)
 	graphNodeCid, err := tl.publishGraphNodeToIPFS(graphNode.GraphNode)
 	if err != nil {
 		return "", err
 	}
 	graphNode.cid = graphNodeCid
-	tl.profile.Tip = graphNodeCid
+	tl.profile.GraphTip = graphNodeCid
 	var previous = tl.profile.cid
 	tl.profile.Previous = &previous
 	tl.signProfile(tl.profile.Profile, tl.profile.privkey) //TODO this should kinda not need args.
@@ -169,38 +180,20 @@ func (tl *Timeline) LoadProfile() error {
 	log.Printf("LoadProfile for id %s / %s, completed in %.2f sec", tl.profileId, tl.profile.DisplayName, time.Since(start).Seconds())
 	return nil
 }
-func (tl *Timeline) determineProfileCid(profileId string) (*string, error){
-	var err error
-	foundProfileCid, cached := tl.ipfs.checkCachedProfileIds(profileId)
-	log.Printf("fetchCheckProfile found %s in cached list? %t", profileId, cached)
-	if cached {
-		return  &foundProfileCid, nil
-	}
-
-	foundProfileCid, delegated := tl.ipfs.checkDelegatedIPNS(profileId)
-	log.Printf("fetchCheckProfile found %s in delegated list? %t", profileId, delegated)
-	if delegated {
-		return  &foundProfileCid, nil
-	}
-
-	foundProfileCid, err = tl.ipfs.resolveIPNS(profileId)
-	foundInIpns := err == nil && foundProfileCid != ""
-	log.Printf("fetchCheckProfile found %s in ipns? %t", profileId, foundInIpns)
-	if err != nil {
-		return nil, err
-	}
-	if foundProfileCid == "" {
-		return nil, fmt.Errorf("determineProfileCid: unable to determine for profileId %s", profileId)
-	}
-	return &foundProfileCid, nil
-}
 
 func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TLProfile, error) {
+	panic("todo: should really be passing in the pubkey no? should probably not be taking it from the profile ")
 
 	//resolve ipns
 	var err error
 	if profileCid == nil {
-		profileCid, err = tl.determineProfileCid(profileId)
+		profileCid, err = tl.ipfs.determineProfileCid(profileId)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("fetchCheckProfile: determined profileCid to be %s", *profileCid)
+	} else {
+		log.Printf("fetchCheckProfile: explicitly requesting profileCid %s", *profileCid)
 	}
 	if profileCid == nil {
 		return nil, errors.New(fmt.Sprintf("could not obtain profile cid for profile id %s", profileId))
@@ -214,16 +207,20 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 		follows: map[string]*TLProfile{},
 		cid: *profileCid,
 	}
-	log.Printf("fecthCheckProfile to fetch profile id %s got raw profile bytes as string: %s", profileId, string(profileBytes))
+	log.Printf("fetchCheckProfile to fetch profile id %s got raw profile bytes as string: %s", profileId, string(profileBytes))
 	err = json.Unmarshal(profileBytes, profile)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("fecthCheckProfile to fetch profile id %s ('%s') got: %#v", profileId, profile.DisplayName, profile)
-	if profile.Previous != nil {
-		log.Printf("fecthCheckProfile previous profile cid for this profile: %s", *profile.Previous)
+	log.Printf("fetchCheckProfile to fetch profile id %s ('%s') got: %#v", profileId, profile.DisplayName, profile)
+	if profile.Id != profileId {
+		return nil, fmt.Errorf("invalid profile with mismatched id. got %s, expected %s", profile.Id, profileId)
 	}
-	log.Printf("fecthCheckProfile tip for profile: %s", profile.Tip)
+
+	if profile.Previous != nil {
+		log.Printf("fetchCheckProfile previous profile cid for this profile: %s", *profile.Previous)
+	}
+	log.Printf("fetchCheckProfile tip for profile: %s", profile.GraphTip)
 
 	//set pubkey
 	pubkey, err := x509.ParsePKCS1PublicKey(profile.Pubkey)
@@ -244,20 +241,20 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 
 func (tl *Timeline) LoadHistory() error {
 	start := time.Now()
-	profileHistory, err := tl.fetchProfileHistory(tl.profile)
+	graphNodeHistory, err := tl.fetchGraphNodeHistory(tl.profile)
 	if err != nil {
 		return err
 	}
-	//tl.history = profileHistory
+	//tl.history = graphNodeHistory
 	log.Printf("LoadHistory: fetched main history for %s by %.2f sec", tl.profile.DisplayName, time.Since(start).Seconds())
 
 	//get a list of profiles we follow by going through our own history
-	followees := tl.extractFollowsProfileCids(profileHistory)
+	followees := tl.extractFollowsProfileCids(graphNodeHistory)
 	log.Printf("%s has %d followees: %#v", tl.profile.DisplayName, len(followees), followees)
 	//get the history of each the people we follow.
 	//we'd be interested in showing their posts and replies-to-us in our timeline too
 	interestedCidNodes:= map[string]*TlGraphNode{}
-	for _, tlGraphNode := range profileHistory {
+	for _, tlGraphNode := range graphNodeHistory {
 		if tlGraphNode.Post == nil { continue }
 		interestedCidNodes[tlGraphNode.cid] = tlGraphNode
 	}
@@ -297,19 +294,19 @@ func (tl *Timeline) LoadHistory() error {
 				return
 			}
 			log.Printf("collecting profile history for %s followee #%d: %s...", tl.profile.DisplayName, idx, followeeProfile.DisplayName)
-			followeeHistory, err := tl.fetchProfileHistory(followeeProfile)
+			followeeGraphNodeHistory, err := tl.fetchGraphNodeHistory(followeeProfile)
 			if err != nil {
 				queue <- tlFolloweeWithHistory{error: err, profileId: followeeProfileId}
 				return
 			}
-			for _, tlGraphNode := range followeeHistory {
+			for _, tlGraphNode := range followeeGraphNodeHistory {
 				if tlGraphNode.Post == nil { continue }
 				interestedCidNodes[tlGraphNode.cid] = tlGraphNode
 			}
 			queue <- tlFolloweeWithHistory{
 				profileId: followeeProfileId,
 				profile: followeeProfile,
-				history: followeeHistory,
+				history: followeeGraphNodeHistory,
 			}
 		}(followeeProfileId, idx)
 	}
@@ -340,27 +337,27 @@ func (tl *Timeline) LoadHistory() error {
 	//	}
 	//	log.Printf("collecting profile history for %s followee #%d: %s...", tl.profile.DisplayName, idx, followeeProfile.DisplayName)
 	//	tl.profile.follows[followeeProfileId] = followeeProfile
-	//	followeeHistory, err := tl.fetchProfileHistory(followeeProfile)
+	//	followeeGraphNodeHistory, err := tl.fetchGraphNodeHistory(followeeProfile)
 	//	if err != nil {
 	//		return err
 	//	}
-	//	for _, tlGraphNode := range followeeHistory {
+	//	for _, tlGraphNode := range followeeGraphNodeHistory {
 	//		if tlGraphNode.Post == nil { continue }
 	//		interestedCidNodes[tlGraphNode.cid] = tlGraphNode
 	//	}
-	//	followeeHistories = append(followeeHistories, followeeHistory)
+	//	followeeHistories = append(followeeHistories, followeeGraphNodeHistory)
 	//}
 	log.Printf("LoadHistory: fetched followee histories for %s by %.2f sec", tl.profile.DisplayName, time.Since(start).Seconds())
 
-	//tl.history = profileHistory
-	tl.insertReplies(interestedCidNodes, profileHistory)
-	for _, followeeHistory := range followeeHistories {
-		tl.history = append(tl.history, followeeHistory...)
-		tl.insertReplies(interestedCidNodes, followeeHistory)
+	//tl.history = graphNodeHistory
+	tl.insertReplies(interestedCidNodes, graphNodeHistory)
+	for _, followeeGraphNodeHistory := range followeeHistories {
+		tl.history = append(tl.history, followeeGraphNodeHistory...)
+		tl.insertReplies(interestedCidNodes, followeeGraphNodeHistory)
 	}
 	//log.Printf("LoadHistory: inserted replies by %.2f sec", time.Since(start).Seconds())
 
-	tl.organizeHistory(append(followeeHistories, profileHistory))
+	tl.organizeHistory(append(followeeHistories, graphNodeHistory))
 	log.Printf("LoadHistory: organized and completed for %s by %.2f sec", tl.profile.DisplayName, time.Since(start).Seconds())
 
 	knownFollowers := []string{} //one way to populate some of this is if anyone we follow follows us back.
@@ -450,9 +447,9 @@ func sortReplies(nodes []*TlGraphNode) {
 	}
 }
 
-func (tl *Timeline) insertReplies(nodesByCid map[string]*TlGraphNode, followeeHistory []*TlGraphNode) {
+func (tl *Timeline) insertReplies(nodesByCid map[string]*TlGraphNode, followeeGraphNodeHistory []*TlGraphNode) {
 	//go through these graphnodes of the followee and for anything where they replied to one of our posts, insert the reply.
-	for _, foloweeGn := range followeeHistory {
+	for _, foloweeGn := range followeeGraphNodeHistory {
 		if foloweeGn.Post == nil || foloweeGn.Post.Reply == nil { continue }
 
 		//this bit probably needs to be figured out a bit better. when a post has multiple reply-to, which one node should it be nested under? for the moment, I'm just going to blindly put it into the one referenced by the last item on the list.
@@ -486,14 +483,14 @@ func (tl *Timeline) extractFollowsProfileCids(history []*TlGraphNode) []string {
 	return follows
 }
 
-func (tl *Timeline) fetchProfileHistory(profile *TLProfile) ([]*TlGraphNode, error) {
+func (tl *Timeline) fetchGraphNodeHistory(profile *TLProfile) ([]*TlGraphNode, error) {
 	start := time.Now()
 
-	var profileHistory []*TlGraphNode
-	currentCid := profile.Tip
+	var graphNodeHistory []*TlGraphNode
+	currentCid := profile.GraphTip
 	log.Printf("trace history for %s, starting with tip cid %s", profile.DisplayName, currentCid)
-	var prevTlGraphNode *TlGraphNode = nil
-	_ = prevTlGraphNode
+	var lastIterTlGraphNode *TlGraphNode = nil
+	_ = lastIterTlGraphNode
 	for {
 		log.Printf("history for %s, fetching graphnode with cid %s", profile.Id, currentCid)
 		currentGraphNode, err := tl.fetchGraphNodeFromIPFS(currentCid)
@@ -515,20 +512,52 @@ func (tl *Timeline) fetchProfileHistory(profile *TLProfile) ([]*TlGraphNode, err
 		if currentGraphNode.Post != nil {
 			tlGraphNode.PreviewText, err = tl.createPostPreview(currentGraphNode.Post)
 		}
-		if prevTlGraphNode != nil {
-			prevTlGraphNode.previousNode = tlGraphNode
+		if lastIterTlGraphNode != nil {
+			lastIterTlGraphNode.previousNode = tlGraphNode
 		}
-		profileHistory = append(profileHistory, tlGraphNode)
-		log.Printf("length of history after adding this entry: %d", len(profileHistory))
+		graphNodeHistory = append(graphNodeHistory, tlGraphNode)
+		log.Printf("length of history after adding this entry: %d", len(graphNodeHistory))
 
 		if currentGraphNode.Previous == nil {
 			log.Println("no further history. all appends made")
 			break
 		}
 		currentCid = *currentGraphNode.Previous
-		prevTlGraphNode = tlGraphNode
+		lastIterTlGraphNode = tlGraphNode
 	}
-	log.Printf("returning list of %d history entries for this profile after %.2fsec", len(profileHistory), time.Since(start).Seconds())
+	log.Printf("returning list of %d history entries for this profile after %.2fsec", len(graphNodeHistory), time.Since(start).Seconds())
+	return graphNodeHistory, nil
+}
+
+func (tl *Timeline) fetchProfileHistory(profile *TLProfile) ([]*TLProfile, error) {
+	start := time.Now()
+
+	var profileHistory []*TLProfile
+	currentCid := profile.cid
+	log.Printf("trace profilehistory for %s, starting with tip cid %s", profile.DisplayName, currentCid)
+	var lastIterTlProfileNode *TLProfile = nil
+	for {
+		log.Printf("profilehistory for %s, fetching profile with cid %s", profile.Id, currentCid)
+
+		currentProfileNode, err := tl.fetchCheckProfile(profile.Id, &currentCid)
+		if err != nil {
+			log.Printf("error getting for profile cid %s: %s", err.Error(), currentCid)
+			return nil, err
+		}
+		if lastIterTlProfileNode != nil {
+			lastIterTlProfileNode.previousProfileNode = currentProfileNode
+		}
+		profileHistory = append(profileHistory, currentProfileNode)
+		log.Printf("length of profilehistory after adding this entry: %d", len(profileHistory))
+
+		if currentProfileNode.Previous == nil {
+			log.Println("no further profile history. all appends made")
+			break
+		}
+		currentCid = *currentProfileNode.Previous
+		lastIterTlProfileNode = currentProfileNode
+	}
+	log.Printf("returning list of %d profilehistory entries for this profile after %.2fsec", len(profileHistory), time.Since(start).Seconds())
 	return profileHistory, nil
 }
 
@@ -716,30 +745,30 @@ func (tl *Timeline)  checkProfileSignature(profile *Profile, pubkey *rsa.PublicK
 func (tl *Timeline)  createSignedProfile(key *rsa.PrivateKey, displayName, bio, tip string, prev *string) *Profile {
 	pubKeyBytes, pubKeyHash := tl.calculateProfileId(&key.PublicKey)
 	profile := Profile{
-		Id:      pubKeyHash,
-		Pubkey:  pubKeyBytes,
+		Id:          pubKeyHash,
+		Pubkey:      pubKeyBytes,
 		DisplayName: displayName,
-		Bio:     bio,
-		Tip:     tip,
-		Previous: prev,
+		Bio:         bio,
+		GraphTip:    tip,
+		Previous:    prev,
 	}
 	tl.signProfile(&profile, key)
 	return &profile
 }
 
-func (tl *Timeline)  createSignedGraphNode(key *rsa.PrivateKey, post *Post, prev *string, follows []string) *GraphNode {
-	panic("deprecated. use GraphNode.Sign()")
-	_, profileId := tl.calculateProfileId(&key.PublicKey)
-	graphnode := GraphNode{
-		Version:      1,
-		Previous:     prev,
-		ProfileId:    profileId,
-		Post:         post,
-		PublicFollow: follows,
-	}
-	//tl.signGraphNode(&graphnode, key)
-	return &graphnode
-}
+//func (tl *Timeline)  createSignedGraphNode(key *rsa.PrivateKey, post *Post, prev *string, follows []string) *GraphNode {
+//	panic("deprecated. use GraphNode.Sign()")
+//	_, profileId := tl.calculateProfileId(&key.PublicKey)
+//	graphnode := GraphNode{
+//		Version:      1,
+//		Previous:     prev,
+//		ProfileId:    profileId,
+//		Post:         post,
+//		PublicFollow: follows,
+//	}
+//	//tl.signGraphNode(&graphnode, key)
+//	return &graphnode
+//}
 
 func (tl *Timeline)  calculateProfileId(pubkey *rsa.PublicKey) ([]byte, string) {
 	pubKeyBytes := x509.MarshalPKCS1PublicKey(pubkey)

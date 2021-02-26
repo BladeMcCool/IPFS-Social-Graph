@@ -78,7 +78,7 @@ async function createProfilePost() {
     unsignedProfileJson = await getUnsignedProfileWithFirstPost(pubkeyb64, unsignedGraphNodeJson, signatureb64, dispname, bio, profiletip, useipnsdelegate)
     console.log("got unsigned profile json like:", unsignedProfileJson)
     unsignedProfile = JSON.parse(unsignedProfileJson)
-    document.getElementById("graphtip").value = unsignedProfile.Tip
+    document.getElementById("graphtip").value = unsignedProfile.GraphTip
     document.getElementById("profileid").value = unsignedProfile.Id
     document.getElementById("ipnsdelegate").value = unsignedProfile.IPNSDelegate ? unsignedProfile.IPNSDelegate : ""
 

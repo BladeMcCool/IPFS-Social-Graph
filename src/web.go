@@ -22,6 +22,7 @@ type APIService struct {
 	WlProfileIdMutex sync.RWMutex
 	FilePathOverride string
 	ListenPort string
+	BaseWlProfileIdList []string
 }
 //var WlProfileIds = map[string]bool{}
 //var WlProfileIdMutex = sync.RWMutex{}
@@ -57,41 +58,34 @@ func (s *APIService) Start() {
 		panic(err)
 	}
 }
-func (s *APIService) setupWl(list []string) {
-	start := time.Now()
-	wg := sync.WaitGroup{}
-	added := map[string]int64{}
-	for _, profileId := range list {
-		s.WlProfileIdMutex.Lock()
+func (s *APIService) setupWl() {
+	for _, profileId := range s.BaseWlProfileIdList {
 		s.WlProfileIds[profileId] = true
 		s.BaseWlProfileIds[profileId] = true
-		added[profileId]++
-		s.WlProfileIdMutex.Unlock()
-
-		log.Printf("setupWl adding %s, going to see the followee profileIds", profileId)
+	}
+	log.Printf("setupWl added %d profiles to the approved list", len(s.BaseWlProfileIdList))
+}
+func (s *APIService) setupExtendedWl() {
+	start := time.Now()
+	wg := sync.WaitGroup{}
+	//added := map[string]int64{}
+	for _, profileId := range s.BaseWlProfileIdList {
+		log.Printf("setupExtendedWl adding %s, going to see the followee profileIds", profileId)
 		wg.Add(1)
 		go func(profileId string) {
 			historyWls := s.getHistoryFollows(profileId)
 			for _, followeePprofileId := range historyWls {
 				s.WlProfileIdMutex.Lock()
 				s.WlProfileIds[followeePprofileId] = true
-				added[profileId]++
+				//added[profileId]++
 				s.WlProfileIdMutex.Unlock()
 			}
+			log.Printf("setupExtendedWl added %d entries on behalf of profileId %s", len(historyWls), profileId)
 			wg.Done()
 		}(profileId)
 	}
 	wg.Wait()
-
-	total := int64(0)
-	s.WlProfileIdMutex.Lock()
-	for profileId, count := range added {
-		log.Printf("setupWl added %d entries on behalf of profileId %s", count, profileId)
-		total += count
-	}
-	s.WlProfileIdMutex.Unlock()
-	log.Printf("setupWl added total of %d profileIds to the wl", total)
-	log.Printf("setupWl: finished after %.2f sec", time.Since(start).Seconds())
+	log.Printf("setupExtendedWl: finished after %.2f sec", time.Since(start).Seconds())
 }
 func (s *APIService) getHistoryFollows(profileId string) []string {
 	tl := &Timeline{
@@ -104,12 +98,12 @@ func (s *APIService) getHistoryFollows(profileId string) []string {
 		log.Printf("getHistoryFollows loadProfile error: %s", err.Error())
 		return nil
 	}
-	profileHistory, err := tl.fetchProfileHistory(tl.profile)
+	graphNodeHistory, err := tl.fetchGraphNodeHistory(tl.profile)
 	if err != nil {
-		log.Printf("getHistoryFollows fetchProfileHistory error: %s", err.Error())
+		log.Printf("getHistoryFollows fetchGraphNodeHistory error: %s", err.Error())
 		return nil
 	}
-	return tl.extractFollowsProfileCids(profileHistory)
+	return tl.extractFollowsProfileCids(graphNodeHistory)
 }
 
 func (s *APIService) WlProfileIdViaPubkeyHeaderAuthMiddleware(next http.Handler) http.Handler {
@@ -327,12 +321,12 @@ func (s *APIService) unsignedProfileWithFirstPost(w http.ResponseWriter, r *http
 
 	pubKeyBytes, pubKeyHash := fakeTl.calculateProfileId(pubkey)
 	profile := Profile{
-		Id:      pubKeyHash,
-		Pubkey:  pubKeyBytes,
+		Id:          pubKeyHash,
+		Pubkey:      pubKeyBytes,
 		DisplayName: args.DisplayName,
-		Bio:     args.Bio,
-		Tip:     graphNodeCid,
-		Previous: args.Previous,
+		Bio:         args.Bio,
+		GraphTip:    graphNodeCid,
+		Previous:    args.Previous,
 	}
 	if args.UseIPNSDelegate == true {
 		profile.IPNSDelegate = fakeTl.ipfs.getIPNSDelegateName()
@@ -422,7 +416,7 @@ func (s *APIService) publishedProfileCid(w http.ResponseWriter, r *http.Request)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		Crypter.writeBinaryIPFSRsaKey(privkey, Crypter.keystorePath +  profile.Id)
+		Crypter.writeBinaryIPFSRsaKey(privkey, profile.Id)
 		fakeTl.ipfs.updateNonDelegateEntry(profile, profileCid)
 		//fakeTl.ipfs.addPrivKeyIPNSPublish(privkey, profile.Id, profileCid)
 	}
