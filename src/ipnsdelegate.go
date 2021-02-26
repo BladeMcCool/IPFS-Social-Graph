@@ -207,7 +207,7 @@ func (df *IPNSDelegateFederation) ExperimentalInit() {
 		}
 		profileIdToTlProfile[profileId] = profilePossbleTlProfiles
 		profileIdToTlProfileHistoryLen[profileId] = profilePossbleTlProfilesHistoryLen
-		log.Printf("went thru %d possibles for %s and ended up with %d possibilities", possiblesCount, profileId, len(possibles))
+		log.Printf("IPNSDelegateFederation went thru %d possibles for %s and ended up with %d possibilities", possiblesCount, profileId, len(possibles))
 	}
 
 	finalBestTips := map[string]string{}
@@ -234,6 +234,7 @@ func (df *IPNSDelegateFederation) ExperimentalInit() {
 	}
 	df.IPNSDelegatedProfileCids = finalBestTips
 	df.initialized = true
+	log.Printf("IPNSDelegateFederation finished going through info gathered from %d federation members for %d total uniqe profileIds", len(df.Members), len(profileIdsPossibleBestTips))
 }
 func (df *IPNSDelegateFederation) Get(profileId string) *string {
 	df.mutex.RLock()
