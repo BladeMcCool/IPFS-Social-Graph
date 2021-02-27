@@ -10,8 +10,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	//"github.com/ipfs/go-ipfs-keystore"
 	"io/ioutil"
 	"log"
 	"net/http/httptest"
@@ -31,31 +33,56 @@ var commonHardcodeTestKey *rsa.PrivateKey
 var commonHardcodeProfileId = "QmabPmcVwPYnEAeTmh7rTJ55QifqRo3fADRFtSSFrK9Yfw"
 var commonIpfsTestKey *rsa.PrivateKey
 var commonIpfsKeyProfileId = "" //determined below. this key will change from install to install.
+var commonIpfsKeyProfileIdb36IPNSName = "" //determined below. this key will change from install to install.
 
 func init() {
 	var err error
 	prikeyB64 := `MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCSeO6s8AvMX+oXezQg2HMXVtNzucEXY3s2iJZyVoAtg7v/MfR8rynizNSQjYzjxTAXnwVVHlPqdHBOOKgWFdOrI3DsqMJzE7SaHMBSxMniBtnkj3rB6Tabj46j5WivLLso/e81cBNDeDT5HoF22aMIdRnB+2+JbRuVio7odJL/N7/PS7kqy4pbuds/Y3qUoUf39esrEO8r+ckD+TsriZ7IabiNmieuzXVMskFL4JNWYCy+GVjfe4ZKaXH39Hzq6I+9CcZxIOQ3+lcO/Eea8TNCP5x545Gsz5jn7lWTxry8vcQ1HGwefaMZM+I40aB2c1NMuEiM+lDTTrCrEHGPt9jdAgMBAAECggEAEHBMnzGgrVsNZ32/E7mfLx0iRbBxDJowY6YwNlxhbdpFUOaPISg6i/b/m0qbp5uDon8JJuysr9lKGmlO6g2gkCo92/2ztx0czZgQ+KkX3Et3DGkS9qzhIVPbBydx2IktZzQasvVlYBLfZR8omglifApCbgw1UCfj6uReVhXxQn3YiCNbbQbArQeThb4EcX533jOfc4jqlEYtbAXNPNy72hkwLaHFiaTLaRK437YILFGoGkig9Ja1awrkDqq+Wd+RHIbEOGpVjRvLIitE/p/ge7ap0UOmEFD3RARSDpff1pa22JvPryQQTpt4smt2XBEc/GqChCcZ29mglf+AWYpK2QKBgQDHQnkDOJH/HdsR6dFePozVQMf/XvdYe8R7ysAJ0SH0i1qpTcD6AUxAYCcwjRNb3LWpU6qelP6IROATCsODg7ZcJBRjQltq2zrbdjeGIGTtOW0HuHBFmlMAK7XG6ywOPcnm0LZR/MJyDBxw8B/Ty2/LOlPmLmmpaIRzYqDs7vq/uQKBgQC8LmaanGFsaXaqT9XRR1oJdYdUegr74tlvf+Mnf2Ll38ejfY86qbm6cNvZjjVU1qmVxNAw4/AnP4mGIebdam+SdtPleBqQn25jI4f0TnaNLEH7egXZks2jKy0uoC8MoKRfTusrSJvKYQFvZBAsIyc0c57H49+DXpdfvosomhGMRQKBgEoE1mEs7YcAdzWTTvQcdkJtmx2xEF7tMxLtQSMkbeGitp33xTzZqJKtZUFy1oMkXNM2wkXAgUDrnPVV5UUAc4iM2on4x27NW3LU2lFXzUYWM/tPN12Ts0t38UGgcLAloc+9Lk0MgMrO1u3ZNWl+w9uRokL6cMO+kJ0wQSliqQD5AoGBAIvHS598mUEV9Xb8Zi5VeaOdETDGlnITRr9zlx83mBZ36qqeEU3Z1IOQYT1wTF0ANmdxEdO+/BurLlPbysicztNUQIEqfVD/m9c4BTyLK7QhM8HAGahLS0PwRldj1I7kpDPHQxebj1z8QTykbv7Z/b0QRNjlgpjqIjaUKnm2N2KhAoGABuoD4423kXDcVPAE2KuAYTE8EWfWKOvDCFNxIKhT2akgtPwmcmksxHZH1bjaV8crh9fxb86VgX7AiWRY58ohZAKBXdYarOYm/hO/sZf9qXTpWB0w0GT7TbWIOfLRA/HaO64Wcr25H8kIJxnGGMi+CXO7hjbuetgxhLPdBth+c98=`
+	log.Printf("Here0")
 	commonHardcodeTestKey, err = getRSAPrivatekeyFromB64(prikeyB64)
 	if err != nil {
 		panic("failed to set up for tests")
 	}
-
+	log.Printf("Here1")
 	err = IPFS.makeKeyInIPFS("test_key")
 	if err != nil && err.Error() != "key/gen: key with name 'test_key' already exists" {
 		panic("failed to set up for tests")
 	}
-	commonIpfsTestKey = Crypter.readBinaryIPFSRsaKey("test_key")
+	log.Printf("Here2")
+	commonIpfsTestKey, err = Crypter.readBinaryIPFSRsaKey("test_key")
+	if err != nil {
+		panic("failed to set up for tests")
+	}
+	log.Printf("Here3")
 	commonIpfsKeyProfileId = Crypter.getPeerIDBase58FromPubkey(&commonIpfsTestKey.PublicKey)
+	commonIpfsKeyProfileIdb36IPNSName, err = Crypter.getIPNSExpectNameFromPubkey(&commonIpfsTestKey.PublicKey)
+	if err != nil {
+		panic("attack")
+	}
 
 	initializers()
+	log.Printf("Here4")
 	log.Println("test init complete")
+}
+
+func TestNewnamestuff (t *testing.T) {
+	name, err := Crypter.getIPNSExpectNameFromPubkey(&commonIpfsTestKey.PublicKey)
+	require.Nil(t, err)
+	require.Equal(t, "k2k4r8nn8amgj8jmk7shlbm71f8u2e7oampdouz7bkjk70np59qklrii", name)
+	log.Print(name)
+
+	_ = IPFS.makeKeyInIPFS("ipnsdelegate2")
+	name2, err := Crypter.getIPNSExpectNameFromBinaryRsaKey("ipnsdelegate2")
+	require.Nil(t, err)
+	require.Equal(t, len(name), len(name2))
+	log.Print("name2: ", name2)
 }
 
 func Test_write_out_and_read_back_an_rsa_key__keys_match(t *testing.T) {
 	fileName := "testkey"
 	keyCreated := Crypter.makeKey(fileName)
-	keyReadback := Crypter.readKey(fileName)
-
+	keyReadback, err := Crypter.readKey(fileName)
+	require.Nil(t, err)
 	_ = os.Remove(fileName)
 	if !keyReadback.Equal(keyCreated) {
 		t.Errorf("keys dont match??")
@@ -114,6 +141,24 @@ func Test_use_binary_rsa_key_from_ipfs(t *testing.T) {
 	// signature is valid
 	fmt.Println("signature verified")
 
+}
+
+func _TestPubsub(t *testing.T) {
+	//was useful when i was first starting on stuff.
+
+	s := shell.NewShell("localhost:7767")
+	kk, err := s.PubSubSubscribe("potatoes")
+	if err != nil {
+		log.Printf("got err when trying to subscribe: %s", err.Error())
+	}
+	require.Nil(t, err)
+	for {
+		msg, err := kk.Next()
+		if err != nil {
+			log.Printf("got err: %s", err.Error())
+		}
+		log.Printf("got msg from %s on potatoes channel: %s", msg.From, string(msg.Data))
+	}
 }
 
 func _TestKeyGen(t *testing.T) {
@@ -179,6 +224,7 @@ func TestPublishDetailsWithKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	resp, err := shell.PublishWithDetails("/ipfs/"+ examplesHashForIPNS, "test_key", time.Second * 100, time.Second * 100, false)
 	if err != nil {
 		t.Fatal(err)
@@ -187,7 +233,8 @@ func TestPublishDetailsWithKey(t *testing.T) {
 	if resp.Value != "/ipfs/" + examplesHashForIPNS {
 		t.Fatalf(fmt.Sprintf("Expected to receive %s but got %s", examplesHashForIPNS, resp.Value))
 	}
-	if resp.Name != commonIpfsKeyProfileId {
+	//if resp.Name != commonIpfsKeyProfileId {
+	if resp.Name != commonIpfsKeyProfileIdb36IPNSName {
 		t.Fatalf("got something unexpected for the name :(")
 	}
 
@@ -208,12 +255,12 @@ func Test_get_peer_id_from_pubkey_in_different_ways(t *testing.T) {
 	expectName := commonHardcodeProfileId
 	//get it using basically the same code that ipfs itself uses
 	//which, upon deeper reading, showed me that its just taking the public key out of the private key, sticking that into pubkey protobuf format, serializing that, hash that, and b58 the result.
-	gotName := Crypter.getIPFSNameFromBinaryRsaKey("binary_rsa_privkey")
+	gotName, _ := Crypter.getIPFSNameFromBinaryRsaKey("binary_rsa_privkey")
 	if gotName != expectName {
 		t.Fatalf("got something unexpected for the name :(")
 	}
 
-	keyReadback := Crypter.readBinaryIPFSRsaKey("binary_rsa_privkey")
+	keyReadback, _ := Crypter.readBinaryIPFSRsaKey("binary_rsa_privkey")
 	//so armed with the insight from poking around in the code above,
 	//we can now just take the rsa pubkey that we might have, say,
 	//got from some profile struct (which will be MarshalPKCS1PublicKey format),
@@ -381,14 +428,13 @@ func Test_make_profile(t *testing.T) {
 	//and of course, the server component would be able to take in an update much faster than IPNS
 	IPNSName := IPFS.publishIPNSUpdate(profileCid, "test_key")
 	// i already know the ipns for the hardcoded key i'm toying with is QmQFsV3XBtEoYnABnJLAey78LVx1Aexc7k3xtppVynv8RU
-	require.Equal(t, commonIpfsKeyProfileId, IPNSName )
-
+	require.Equal(t, commonIpfsKeyProfileIdb36IPNSName, IPNSName )
 	fmt.Println("got here without dying")
 }
 
 func Test_sign_and_verify_graphnode(t *testing.T) {
 	//lets use one of the keys we made had IPFS make earlier (copied testKey3 to this local binary_rsa_privkey)
-	keyReadback := Crypter.readBinaryIPFSRsaKey("test_key")
+	keyReadback, _ := Crypter.readBinaryIPFSRsaKey("test_key")
 	post := Post{
 		MimeType: "text/plain",
 		Cid: "abcdpotatoes",
@@ -414,7 +460,7 @@ func Test_sign_and_verify_graphnode(t *testing.T) {
 
 func Test_sign_and_verify_profile(t *testing.T) {
 	//lets use one of the keys we made had IPFS make earlier (copied testKey3 to this local binary_rsa_privkey)
-	keyReadback := Crypter.readBinaryIPFSRsaKey("test_key")
+	keyReadback, _ := Crypter.readBinaryIPFSRsaKey("test_key")
 	tl := &Timeline{crypter: Crypter, ipfs: IPFS}
 	profile := tl.createSignedProfile(
 		keyReadback,
@@ -442,6 +488,7 @@ func (ts *testTimeService) GetTime() JSONTime {
 
 func Test_create_and_read_back_chain_of_posts(t *testing.T) {
 	// make a profile, I suppose until we make a first post it can have a blank value for GraphTip.
+	Federation.Init()
 	createdProfileInfo := createChainOfPosts(t)
 	readBackChainOfPosts(t, createdProfileInfo)
 }
@@ -579,7 +626,7 @@ func readBackChainOfPosts(t *testing.T, createdProfileInfo []*TLProfile) {
 		"gollum",
 		"samwise-gamgee",
 	} {
-		privateKey := Crypter.readBinaryIPFSRsaKey(name)
+		privateKey, _ := Crypter.readBinaryIPFSRsaKey(name)
 		t.Logf("keyname: %s profileId %s", name, Crypter.getPeerIDBase58FromPubkey(&privateKey.PublicKey))
 	}
 	//panic("nope")
@@ -909,8 +956,9 @@ func Test_IPNSDelegateFederation(t *testing.T) {
 	//instantiate the thing that will resolve this stuff using both of those delegateipns1 and delegateipns2 as the entirety of the federation.
 	testFederation := IPNSDelegateFederation{
 		Members : []IPNSFederationMember{ fedMember1, fedMember2 },
+		IPNSDelegatedProfileCids: map[string]string{},
 	}
-	testFederation.ExperimentalInit()
+	testFederation.PullUpdatesAndSelectBestTips()
 
 	for i, e := range timelines {
 		wantHere := want[i]
@@ -923,6 +971,7 @@ func Test_IPNSDelegateFederation(t *testing.T) {
 
 }
 func TestIPNSDelegateSlam(t *testing.T) {
+	Federation.Init()
 
 	timeService := &testTimeService{
 		curTime: JSONTime(time.Now().UTC()),

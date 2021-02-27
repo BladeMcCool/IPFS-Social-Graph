@@ -20,7 +20,8 @@
         <p>Follow ProfileId:&nbsp;<input type="text" id="followprofileid" name="followprofileid">&nbsp;<button onclick="clearFollow()">Clear</button></p><!-- a ProfileId -->
         <p>
           <button onclick="createProfilePost()">Create Profile Post</button>
-          <input type="checkbox" id="sendprivkey" name="sendprivkey" value="sendprivkey"><label title="Temporary hacks to facilitate functionality, probably only safe for use with server under your control on localhost or via https. Ideally the server never sees our private key though, only use this experimentally." for="sendprivkey">Send my <b>private key to the server</b> so that it can sign/publish my IPNS</label>
+          <!-- hidden -- too much ipns publishing seems to be bad. also this is pretty insecure anyway. -->
+          <span style="display: none;"><input disabled  type="checkbox" id="sendprivkey" name="sendprivkey" value="sendprivkey"><label title="Temporary hacks to facilitate functionality, probably only safe for use with server under your control on localhost or via https. Ideally the server never sees our private key though, only use this experimentally." for="sendprivkey">Send my <b>private key to the server</b> so that it can sign/publish my IPNS</label></span>
         </p>
         <hr>
         <p>

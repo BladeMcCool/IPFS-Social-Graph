@@ -79,12 +79,18 @@ type IPNSDelegateFederation struct {
 	memberNames []string
 	mutex sync.RWMutex
 	IPNSDelegatedProfileCids map[string]string
+	protectedProfileCids map[string]string
 	ipnsName string
 	ipfs *IPFSCommunicator
 	bestTips map[string]string
 	initialized bool
 }
 func (df *IPNSDelegateFederation) Init() {
+	df.mutex.Lock()
+	df.IPNSDelegatedProfileCids = map[string]string{}
+	df.protectedProfileCids = map[string]string{}
+	df.mutex.Unlock()
+
 	baseMember := IPNSFederationMember{
 		name: "self",
 		resolverFetcher: &IPNSResolverFetcher{
@@ -93,15 +99,13 @@ func (df *IPNSDelegateFederation) Init() {
 		},
 	}
 	IPNSDelegatedProfileCids, err := baseMember.resolverFetcher.ResolveFetch()
-
-	df.mutex.Lock()
-	defer df.mutex.Unlock()
 	if err != nil {
-		log.Printf("IPNSDelegateFederation: Init err: %s", err.Error())
-		df.IPNSDelegatedProfileCids = map[string]string{}
+		log.Printf("IPNSDelegateFederation Init Error %s", err.Error())
 		return
 	}
-	df.IPNSDelegatedProfileCids = IPNSDelegatedProfileCids
+
+	df.mergeInProfileTipCids(IPNSDelegatedProfileCids)
+
 	if df.Members == nil { df.Members = []IPNSFederationMember{} }
 
 	for _, memberIPNS := range df.memberNames {
@@ -118,14 +122,32 @@ func (df *IPNSDelegateFederation) Init() {
 	//df.initialized = true
 	//df.RunBackgroundUpdateFetcherProcessor()
 }
+func (df *IPNSDelegateFederation) mergeInProfileTipCids(profileTipCids map[string]string) {
+	df.mutex.Lock()
+	defer df.mutex.Unlock()
+	for profileId, profileCid := range profileTipCids {
+		//if _, found := df.protectedProfileCids[profileId]; found {
+		//	//i'm not really sure this is an actual issue .... i want to log when this happens for now and allow it.
+		//	log.Printf("mergeInProfileTipCids overwriting protected profileid %s with cid %s", profileId, profileCid)
+		//}
+		df.IPNSDelegatedProfileCids[profileId] = profileCid
+	}
+
+	for profileId, profileCid := range df.IPNSDelegatedProfileCids {
+		log.Printf("mergeInProfileTipCids after merge: %s -> %s", profileId, profileCid)
+	}
+
+}
+
 func (df *IPNSDelegateFederation) RunBackgroundUpdateFetcherProcessor() {
 	minCycleTimeSec := float64(90)
 	log.Println("RunBackgroundUpdateFetcherProcessor starting up")
 	for {
 		start := time.Now()
-		df.ExperimentalInit()
+		df.PullUpdatesAndSelectBestTips()
+		df.initialized = true
 		tookSec := time.Since(start).Seconds()
-		log.Printf("RunBackgroundUpdateFetcherProcessor ExperimentalInit took %.2f sec to complete", tookSec)
+		log.Printf("RunBackgroundUpdateFetcherProcessor PullUpdatesAndSelectBestTips took %.2f sec to complete", tookSec)
 		if tookSec < minCycleTimeSec {
 			// make sure we don't slam it more than we have to.
 			time.Sleep(time.Duration(minCycleTimeSec-tookSec) * time.Second)
@@ -134,19 +156,21 @@ func (df *IPNSDelegateFederation) RunBackgroundUpdateFetcherProcessor() {
 	}
 }
 
-func (df *IPNSDelegateFederation) ExperimentalInit() {
+func (df *IPNSDelegateFederation) PullUpdatesAndSelectBestTips() {
 	// we need to go through the membership names and get all the results of the lists.
 	start := time.Now()
 	profileIdsPossibleBestTips := map[string]map[string]bool{}
 	//wg := sync.WaitGroup{}
 
+	//TODO split this up
+
 	for _, member := range df.Members {
 		profileCids, err := member.resolverFetcher.ResolveFetch()
 		if err != nil {
-			log.Printf("IPNSDelegateFederation oops for %s: %s", member.name, err.Error())
+			log.Printf("PullUpdatesAndSelectBestTips oops for %s: %s", member.name, err.Error())
 			return
 		}
-		log.Printf("IPNSDelegateFederation from %s: %#v", member.name, profileCids)
+		log.Printf("PullUpdatesAndSelectBestTips from %s: %#v", member.name, profileCids)
 		for profileId, profileCid := range profileCids {
 			if _, found := profileIdsPossibleBestTips[profileId]; !found {
 				profileIdsPossibleBestTips[profileId] = map[string]bool{}
@@ -154,31 +178,17 @@ func (df *IPNSDelegateFederation) ExperimentalInit() {
 			profileIdsPossibleBestTips[profileId][profileCid] = true
 		}
 	}
-	//
-	//for _, xMemberName := range df.memberNames {
-	//	wg.Add(1)
-	//	membercount++
-	//	go func(memberName string) {
-	//		defer wg.Done()
-	//		profileCids, err := df.getCurrentDelegatedProfileCids(memberName)
-	//		if err != nil {
-	//			log.Printf("IPNSDelegateFederation oops for %s: %s", memberName, err.Error())
-	//			return
-	//		}
-	//		log.Printf("IPNSDelegateFederation from %s: %#v", memberName, profileCids)
-	//		df.mutex.RLock()
-	//		for profileId, profileCid := range profileCids {
-	//			if _, found := profileIdsPossibleBestTips[profileId]; !found {
-	//				profileIdsPossibleBestTips[profileId] = map[string]bool{}
-	//			}
-	//			profileIdsPossibleBestTips[profileId][profileCid] = true
-	//		}
-	//		df.mutex.RUnlock()
-	//	}(xMemberName)
-	//}
-	//log.Printf("IPNSDelegateFederation Init waiting for %d member lists to get found and loaded", membercount)
-	//wg.Wait()
-	log.Printf("IPNSDelegateFederation Init got done collecting data from %d member lists that after %.2f sec", len(df.Members),  time.Since(start).Seconds())
+
+	//consider also anything that has been updated through the server directly. generally this should be the most accurate one in the end i would think, except for the client that just decided to switch to some other server.
+	for profileId, profileCid := range df.protectedProfileCids {
+		if _, found := profileIdsPossibleBestTips[profileId]; !found {
+			profileIdsPossibleBestTips[profileId] = map[string]bool{}
+		}
+		profileIdsPossibleBestTips[profileId][profileCid] = true
+	}
+
+
+	log.Printf("PullUpdatesAndSelectBestTips got done collecting data from %d member lists that after %.2f sec", len(df.Members),  time.Since(start).Seconds())
 
 	//now we have to go through all that and decide what is the best one for each.
 	profileIdToTlProfile := map[string]map[string]*TLProfile{}
@@ -207,7 +217,7 @@ func (df *IPNSDelegateFederation) ExperimentalInit() {
 		}
 		profileIdToTlProfile[profileId] = profilePossbleTlProfiles
 		profileIdToTlProfileHistoryLen[profileId] = profilePossbleTlProfilesHistoryLen
-		log.Printf("IPNSDelegateFederation went thru %d possibles for %s and ended up with %d possibilities", possiblesCount, profileId, len(possibles))
+		log.Printf("PullUpdatesAndSelectBestTips went thru %d possibles for %s and ended up with %d possibilities", possiblesCount, profileId, len(possibles))
 	}
 
 	finalBestTips := map[string]string{}
@@ -232,9 +242,11 @@ func (df *IPNSDelegateFederation) ExperimentalInit() {
 			finalBestTips[profileId] = bestProfileTipCid
 		}
 	}
-	df.IPNSDelegatedProfileCids = finalBestTips
-	df.initialized = true
-	log.Printf("IPNSDelegateFederation finished going through info gathered from %d federation members for %d total uniqe profileIds", len(df.Members), len(profileIdsPossibleBestTips))
+	for profileId, profileCid := range finalBestTips {
+		log.Printf("PullUpdatesAndSelectBestTips final best tip: %s -> %s", profileId, profileCid)
+	}
+	df.mergeInProfileTipCids(finalBestTips)
+	log.Printf("PullUpdatesAndSelectBestTips finished going through info gathered from %d federation members for %d total uniqe profileIds", len(df.Members), len(profileIdsPossibleBestTips))
 }
 func (df *IPNSDelegateFederation) Get(profileId string) *string {
 	df.mutex.RLock()
@@ -249,6 +261,7 @@ func (df *IPNSDelegateFederation) Set(profileId, profileCid string) {
 	df.mutex.Lock()
 	defer df.mutex.Unlock()
 	df.IPNSDelegatedProfileCids[profileId] = profileCid
+	df.protectedProfileCids[profileId] = profileCid
 }
 func (df *IPNSDelegateFederation) Del(profileId string) {
 	df.mutex.Lock()
@@ -260,7 +273,7 @@ func (df *IPNSDelegateFederation) Del(profileId string) {
 
 func (df *IPNSDelegateFederation) publishDelegatedIPNSUpdate() {
 	if (!df.initialized) {
-		log.Printf("publishDelegatedIPNSUpdate: not initialized, skipping for now ...")
+		log.Printf("publishDelegatedIPNSUpdate: initialization not yet complete -- skipping for now ...")
 		return
 	}
 	log.Println("publishDelegatedIPNSUpdate ...")
@@ -275,6 +288,6 @@ func (df *IPNSDelegateFederation) publishDelegatedIPNSUpdate() {
 	updatedListCid := df.ipfs.addContentToIPFS(updatedListBytes)
 	ipnsname := df.ipfs.publishIPNSUpdate(updatedListCid, df.ipfs.IPNSDelegateKeyName)
 	//log.Printf("ipns update for profileid %s with profile tip cid of %s complete -- got new master dict cid of %s (using delegated ipns %s)", profile.Id, profileCid, updatedListCid, ipnsname)
-	log.Printf("ipns update for delegates complete -- got new master dict cid of %s (using delegated ipns %s)", updatedListCid, ipnsname)
+	log.Printf("publishDelegatedIPNSUpdate ipns update for delegates complete -- got new master dict cid of %s (using delegated ipns %s)", updatedListCid, ipnsname)
 }
 

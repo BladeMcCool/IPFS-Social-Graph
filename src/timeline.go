@@ -182,8 +182,6 @@ func (tl *Timeline) LoadProfile() error {
 }
 
 func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TLProfile, error) {
-	//panic("todo: should really be passing in the pubkey no? should probably not be taking it from the profile ")
-
 	//resolve ipns
 	var err error
 	if profileCid == nil {
@@ -226,6 +224,11 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 	pubkey, err := x509.ParsePKCS1PublicKey(profile.Pubkey)
 	if err != nil {
 		return nil, err
+	}
+
+	derivedProfileId := tl.crypter.getPeerIDBase58FromPubkey(pubkey)
+	if derivedProfileId != profileId {
+		return nil, fmt.Errorf("invalid profile with mismatched pubkey. derived %s from pubkey, expected %s", derivedProfileId, profileId)
 	}
 
 	//verify self-signature of profile.

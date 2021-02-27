@@ -50,8 +50,9 @@ func (s *APIService) Start() {
 	authedRouter.HandleFunc("/unsignedGraphNodeForPost", s.unsignedGraphNodeForPost).Methods("POST")
 	authedRouter.HandleFunc("/unsignedProfileWithFirstPost", s.unsignedProfileWithFirstPost).Methods("POST")
 	authedRouter.HandleFunc("/publishedProfileCid", s.publishedProfileCid).Methods("POST")
-	authedRouter.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET")
+	authedRouter.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET","POST")
 	authedRouter.HandleFunc("/history", s.history).Methods("POST")
+	authedRouter.HandleFunc("/profileBestTip", s.profileBestTip).Methods("POST")
 
 	err := http.ListenAndServe(":"+s.ListenPort,  c.Handler(router))
 	if err != nil {
@@ -510,4 +511,50 @@ func (s *APIService) history(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(tlLinesJson)
+}
+
+type ProfileBestTipJsonArgs struct {
+	ProfileId string `json: "profileId"`
+}
+func (s *APIService) profileBestTip(w http.ResponseWriter, r *http.Request) {
+	args := &ProfileBestTipJsonArgs{}
+	err := json.NewDecoder(r.Body).Decode(&args)
+	if err != nil {
+		log.Println("decode error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	profileCidPtr := Federation.Get(args.ProfileId)
+	if profileCidPtr == nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	profileBytes, err := IPFS.getCidFileBytes(*profileCidPtr)
+	if err != nil {
+		log.Println("profile data obtainment error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	profile := &Profile{}
+	err = json.Unmarshal(profileBytes, profile)
+	if err != nil {
+		log.Println("profile data decode error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	type bestTipResponse struct {
+		ProfileData Profile
+		ProfileCid string
+	}
+	outBytes, err := json.Marshal(&bestTipResponse{*profile, *profileCidPtr})
+	if err != nil {
+		log.Println("profile data decode error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(outBytes)
 }

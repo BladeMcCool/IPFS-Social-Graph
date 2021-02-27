@@ -40,7 +40,6 @@ func initializers() {
 		ipnsName: *IPNSDelegateName,
 		memberNames: getIPNSFederationMembernames(),
 		ipfs: IPFS,
-		IPNSDelegatedProfileCids: map[string]string{},
 	}
 
 }

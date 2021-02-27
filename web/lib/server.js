@@ -111,6 +111,28 @@ async function getLatestTimelineTexts(pubkeyb64, profiletip) {
     return result
 }
 
+async function profileBestTip(profileId) {
+    console.log("profileBestTip...")
+    if (!profileId) {
+        console.log("profileBestTip: no data - do nothing")
+        return ""
+    }
+    payload = {"profileId":profileId}
+    console.log("send payload to get profileBestTip like", payload)
+    result = await makeRequest("POST", serviceBaseUrl + "/service/profileBestTip", payload, true)
+    // console.log("got history result like:", result)
+    return JSON.parse(result)
+}
+
+async function IPNSDelegateName() {
+    console.log("IPNSDelegateName...")
+    if (!profileId) {
+        console.log("IPNSDelegateName: no data - do nothing")
+        return ""
+    }
+    result = await makeRequest("POST", serviceBaseUrl + "/service/IPNSDelegateName", null, true)
+    return result
+}
 
 var requestTracker = {}
 function makeRequest(method, url, payload, track) {
@@ -125,7 +147,13 @@ function makeRequest(method, url, payload, track) {
             requestTracker[url] = xhr
         }
         xhr.open(method, url);
-        xhr.setRequestHeader("X-Pubkey-B64", identities[selectedIdentity]["pub"]);
+        if (selectedIdentity == null) {
+            pubb64 = importPubkey
+        } else {
+            pubb64 = identities[selectedIdentity]["pub"]
+        }
+        console.log("sending this pub64:", pubb64)
+        xhr.setRequestHeader("X-Pubkey-B64", pubb64);
         xhr.onload = function() {
             if (this.status >= 200 && this.status < 300) {
                 resolve(xhr.response);

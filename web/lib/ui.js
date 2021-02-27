@@ -1,5 +1,6 @@
 var identities
 var selectedIdentity
+var importPubkey
 
 async function reloadSession() {
     await loadServiceBaseUrl()

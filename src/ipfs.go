@@ -32,7 +32,10 @@ func (ic *IPFSCommunicator) getIPNSDelegateName() *string {
 	//i imagine that the entries in the delegated lookup page will be a map[profileid]latestcidAndsignature
 	//keyname := "ipnsdelegate"
 	_ = ic.makeKeyInIPFS(ic.IPNSDelegateKeyName)
-	ipfsName := Crypter.getIPFSNameFromBinaryRsaKey(ic.IPNSDelegateKeyName)
+	ipfsName, err := Crypter.getIPFSNameFromBinaryRsaKey(ic.IPNSDelegateKeyName)
+	if err != nil {
+		panic(err)
+	}
 	log.Printf("getIPNSDelegateName: determined a name of %s", ipfsName)
 	return &ipfsName
 }
@@ -52,7 +55,8 @@ func (ic *IPFSCommunicator) publishIPNSUpdate(cid, keyName string) string {
 	log.Printf("publishIPNSUpdate: starting for profileId %s -> %s", keyName, cid)
 	start := time.Now()
 	//keyFileName := Crypter.keystorePath + keyName
-	var expectName = Crypter.getIPFSNameFromBinaryRsaKey(keyName)
+	//var expectName, _ = Crypter.getIPFSNameFromBinaryRsaKey(keyName)
+	var expectName, _ = Crypter.getIPNSExpectNameFromBinaryRsaKey(keyName)
 	log.Printf("publishIPNSUpdate: new value for key %s / peer id %s: %s", keyName, expectName, cid)
 	resp, err := ic.shell.PublishWithDetails("/ipfs/"+ cid, keyName, time.Hour * 100, time.Second * 60, false)
 	if err != nil {
@@ -64,7 +68,7 @@ func (ic *IPFSCommunicator) publishIPNSUpdate(cid, keyName string) string {
 		log.Fatalf("Expected to receive %s but got %s", cid, resp.Value)
 	}
 	if resp.Name != expectName {
-		log.Fatalf("got unexpected name back")
+		log.Fatalf("publishIPNSUpdate: got unexpected name back: %s -- expected to get %s", resp.Name, expectName)
 	}
 	log.Printf("publishIPNSUpdate: finished for %s after %.2f sec", keyName, time.Since(start).Seconds())
 	return expectName
@@ -97,7 +101,7 @@ func (ic *IPFSCommunicator) resolveIPNS(cid string) (string, error) {
 }
 
 func (ic *IPFSCommunicator) determineProfileCid(profileId string) (*string, error){
-	var err error
+	//var err error
 	foundProfileCid, cached := ic.checkCachedProfileIds(profileId)
 	log.Printf("determineProfileCid found %s in cached list? %t", profileId, cached)
 	if cached {
@@ -110,12 +114,13 @@ func (ic *IPFSCommunicator) determineProfileCid(profileId string) (*string, erro
 		return  &foundProfileCid, nil
 	}
 
-	foundProfileCid, err = ic.resolveIPNS(profileId)
-	foundInIpns := err == nil && foundProfileCid != ""
-	log.Printf("determineProfileCid found %s in ipns? %t", profileId, foundInIpns)
-	if err != nil {
-		return nil, err
-	}
+	//foundProfileCid, err = ic.resolveIPNS(profileId)
+	//foundInIpns := err == nil && foundProfileCid != ""
+	//log.Printf("determineProfileCid found %s in ipns? %t", profileId, foundInIpns)
+	//if err != nil {
+	//	return nil, err
+	//}
+
 	if foundProfileCid == "" {
 		return nil, fmt.Errorf("determineProfileCid: unable to determine for profileId %s", profileId)
 	}

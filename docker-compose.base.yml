@@ -6,7 +6,7 @@ x-variables: &environment
 services:
   ipfs0:
     container_name: ipfs0
-    image: ipfs/go-ipfs:release
+    image: ipfs/go-ipfs:v0.8.0
     ports:
      - "7766:4001" # ipfs swarm - expose if needed/wanted
      - "7767:5001" # ipfs api - expose if needed/wanted
@@ -19,7 +19,7 @@ services:
 
   ipfs2:
     container_name: ipfs2
-    image: ipfs/go-ipfs:release
+    image: ipfs/go-ipfs:v0.8.0
     ports:
      - "7866:4001" # ipfs swarm - expose if needed/wanted
      - "7867:5001" # ipfs api - expose if needed/wanted

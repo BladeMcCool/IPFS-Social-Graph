@@ -30,13 +30,11 @@ async function setIdentity(keyname) {
     privTextarea = document.getElementById("privkeyb64")
     privTextarea.innerHTML = identity["priv"]
 
-    if (!identity["profileid"]) {
-        // console.log("setIdentity, no profileId set, let us get the server to interpret our pubkey for us") //since trying to figure it out in JS right now is a waste of time and not 'easy' and likely involves at least 3 extenal libraries (something for x509/asn.1 der decode/extract of pk bytes which i failed to figure out, plus multihash and base58, the latter of which i had some luck finding workable implementations.)
-        // identity["profileid"] = await makeRequest("GET", serviceBaseUrl + "/peerId")
-        // console.log("got profileId from server: ", identity["profileid"])
-        console.log("figure out profileId")
-        identity["profileid"] = await peerutil.peerid(identity["pub"])
-    }
+    // if (!identity["profileid"]) {
+    //     //this will happen from making a new one.
+    //     console.log("figure out profileId")
+    //     identity["profileid"] = await peerutil.peerid(identity["pub"])
+    // }
 
     document.getElementById("dispname").value = identity["dispname"] ? identity["dispname"] : ""
     document.getElementById("bio").value = identity["bio"] ? identity["bio"] : ""
@@ -82,6 +80,7 @@ async function newIdentity() {
     pkcs8 = await window.crypto.subtle.exportKey('pkcs8', keypair.privateKey)
     pkcs8b64 = arrayBufferToBase64String(pkcs8)
     console.log("privkey b64 in pkcs8", pkcs8b64)
+    profileId = await peerutil.peerid(spkib64)
 
     newIdentitySettings = {
         "pub":spkib64,
@@ -90,7 +89,7 @@ async function newIdentity() {
         "bio":"",
         "graphtip":"",
         "profiletip":"",
-        "profileid":"",
+        "profileid":profileId,
         "ipnsdelegate":"",
     }
 
@@ -217,16 +216,24 @@ async function importKeyAsIdentity() {
         return
     }
     console.log("pubkey b64 in PKIX", spkib64)
+    importPubkey = spkib64
+
+    profileId = await peerutil.peerid(identity["pub"])
+    console.log("trying to import profile with id:", profileId)
+    ipnsDelegate = await IPNSDelegateName()
+    console.log("trying to import profile .. got ipnsdelegate from the currently configured server:", ipnsDelegate)
+    profileTipData = await profileBestTip(profileId)
+    console.log("trying to import profile with data like:", profileTipData)
 
     newIdentitySettings = {
         "pub":spkib64,
         "priv":pkcs8b64,
-        "dispname":"",
-        "bio":"",
-        "graphtip":"",
-        "profiletip":"",
-        "profileid":"",
-        "ipnsdelegate":"",
+        "dispname":profileTipData ? profileTipData["ProfileData"]["DisplayName"] : "",
+        "bio":profileTipData ? profileTipData["ProfileData"]["Bio"] : "",
+        "graphtip":profileTipData ? profileTipData["ProfileData"]["GraphTip"] : "",
+        "profiletip":profileTipData ? profileTipData["ProfileCid"]: "",
+        "profileid":profileId,
+        "ipnsdelegate":ipnsDelegate,
     }
 
     identities[newidentname] = newIdentitySettings

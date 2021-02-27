@@ -7,16 +7,25 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base32"
 	"encoding/pem"
 	"fmt"
 	"github.com/gogo/protobuf/proto"
 	ci "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multibase"
+
+	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	pb "github.com/libp2p/go-libp2p-core/crypto/pb"
+	//"github.com/libp2p/go-libp2p-core/peer"
 	b58 "github.com/mr-tron/base58/base58"
+	//"github.com/multiformats/go-multibase"
 	mh "github.com/multiformats/go-multihash"
+	//"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 )
 
 type CryptoUtil struct {
@@ -75,12 +84,12 @@ func  (cu *CryptoUtil) savePEMKey(fileName string, key *rsa.PrivateKey) {
 	checkError(err)
 }
 
-func (cu *CryptoUtil)  readKey(fileName string) *rsa.PrivateKey {
+func (cu *CryptoUtil)  readKey(fileName string) (*rsa.PrivateKey, error) {
 	//for standard PEM encoded rsa PKCS1 encoded RSA private key.
 	privateKeyFile, err := os.Open(fileName)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	pemfileinfo, _ := privateKeyFile.Stat()
@@ -94,18 +103,24 @@ func (cu *CryptoUtil)  readKey(fileName string) *rsa.PrivateKey {
 	privateKeyImported, err := x509.ParsePKCS1PrivateKey(data.Bytes)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return nil, err
 	}
 	fmt.Println("Private Key : ", privateKeyImported)
-	return privateKeyImported
+	return privateKeyImported, nil
 }
 
-func (cu *CryptoUtil)  readBinaryIPFSRsaKey(fileName string) *rsa.PrivateKey {
-	privateKeyFile, err := os.Open(cu.ipfsKeystorePath + "/" + fileName)
+const keyFilenamePrefix = "key_"
+func getKeyfileName(raw string) string {
+	var codec = base32.StdEncoding.WithPadding(base32.NoPadding)
+	return keyFilenamePrefix + strings.ToLower(codec.EncodeToString([]byte(raw)))
+	//log.Print(keyfileName)
+}
+
+func (cu *CryptoUtil)  readBinaryIPFSRsaKey(fileName string) (*rsa.PrivateKey, error) {
+	privateKeyFile, err := os.Open(cu.ipfsKeystorePath + "/" + getKeyfileName(fileName))
 	if err != nil {
 		fmt.Println(err)
-		//TODO probably should return an error instead.
-		os.Exit(1)
+		return nil, err
 	}
 
 	pemfileinfo, _ := privateKeyFile.Stat()
@@ -123,10 +138,10 @@ func (cu *CryptoUtil)  readBinaryIPFSRsaKey(fileName string) *rsa.PrivateKey {
 	privateKeyImported, err := x509.ParsePKCS1PrivateKey(key.Data)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return nil, err
 	}
 	//fmt.Println("Private Key : ", privateKeyImported)
-	return privateKeyImported
+	return privateKeyImported, nil
 }
 
 
@@ -142,13 +157,13 @@ func (cu *CryptoUtil)  writeBinaryIPFSRsaKey(privkey *rsa.PrivateKey, fileName s
 	return err
 }
 
-func (cu *CryptoUtil)  getIPFSNameFromBinaryRsaKey(fileName string) string {
+func (cu *CryptoUtil)  getIPFSNameFromBinaryRsaKey(fileName string) (string, error) {
 	// was referring to https://stackoverflow.com/questions/51433889/is-it-possible-to-derive-an-ipns-name-from-an-ipfs-keypair-without-publishing for some of this.
 	// but i left out the code that would fall back to a mh.ID algo if the data was too short b/c the data is never going to be that short for these.
-	privateKeyFile, err := os.Open(cu.ipfsKeystorePath + "/" + fileName)
+	privateKeyFile, err := os.Open(cu.ipfsKeystorePath + "/" + getKeyfileName(fileName))
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return "", err
 	}
 
 	pbfileinfo, _ := privateKeyFile.Stat()
@@ -163,7 +178,7 @@ func (cu *CryptoUtil)  getIPFSNameFromBinaryRsaKey(fileName string) string {
 	checkError(err)
 	hash, _ := mh.Sum(pubBytes, mh.SHA2_256, -1)
 	peerID := b58.Encode(hash)
-	return peerID
+	return peerID, nil
 }
 
 func (cu *CryptoUtil)  getPeerIDBase58FromPubkey(pubkey *rsa.PublicKey) string {
@@ -182,4 +197,59 @@ func (cu *CryptoUtil)  getPeerIDBase58FromPubkey(pubkey *rsa.PublicKey) string {
 	hash, _ := mh.Sum(pubkeyProtoBytes, mh.SHA2_256, -1)
 	peerID := b58.Encode(hash)
 	return peerID
+}
+
+
+
+func (cu *CryptoUtil)  getIPNSExpectNameFromPubkey(pubkey *rsa.PublicKey) (string, error) {
+	//and then it changed in 0.7 to this. (see https://blog.ipfs.io/2020-09-24-go-ipfs-0-7-0/ etc)
+	data, err := x509.MarshalPKIXPublicKey(pubkey)
+	if err != nil {
+		return "", err
+	}
+	pubAlternateFormat, err := p2pcrypto.UnmarshalRsaPublicKey(data)
+	if err != nil {
+		return "", err
+	}
+	peerIdObj, err := peer.IDFromPublicKey(pubAlternateFormat) //seems to actually a mh256 of the protobuf of the pkix output of the key.
+	if err != nil {
+		return "", err
+	}
+	cidv1 := peer.ToCid(peerIdObj)
+	cidv1Bytes := cidv1.Bytes()
+	ipnsName, err := multibase.Encode(multibase.Base36, cidv1Bytes)
+	if err != nil {
+		return "", err
+	}
+	return ipnsName, nil
+}
+
+
+func (cu *CryptoUtil)  getIPNSExpectNameFromBinaryRsaKey(fileName string) (string, error) {
+	privateKeyFile, err := os.Open(cu.ipfsKeystorePath + "/" + getKeyfileName(fileName))
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+
+	pbfileinfo, _ := privateKeyFile.Stat()
+	var size int64 = pbfileinfo.Size()
+	rawbytes := make([]byte, size)
+	buffer := bufio.NewReader(privateKeyFile)
+	_, err = buffer.Read(rawbytes)
+	ipfsKey, err := ci.UnmarshalPrivateKey(rawbytes)
+	checkError(err)
+
+	pubBytes, err := ipfsKey.GetPublic().Bytes()
+	checkError(err)
+	hash, _ := mh.Sum(pubBytes, mh.SHA2_256, -1)
+
+
+	cidv1 := peer.ToCid(peer.ID(hash))
+	cidv1Bytes := cidv1.Bytes()
+	ipnsName, err := multibase.Encode(multibase.Base36, cidv1Bytes)
+	if err != nil {
+		return "", err
+	}
+	return ipnsName, nil
 }
