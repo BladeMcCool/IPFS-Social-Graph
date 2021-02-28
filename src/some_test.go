@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	//"github.com/ipfs/go-ipfs-keystore"
+
 	"io/ioutil"
 	"log"
 	"net/http/httptest"
@@ -65,6 +65,16 @@ func init() {
 	log.Println("test init complete")
 }
 
+func _TestReplacePublishedDelegateIPNSData(t *testing.T)  {
+	//Federation.mutex.Lock()
+	//defer Federation.mutex.Unlock()
+	old := Federation.IPNSDelegatedProfileCids
+	Federation.initialized = true
+	Federation.IPNSDelegatedProfileCids = map[string]string{}
+	Federation.publishDelegatedIPNSUpdate()
+	Federation.IPNSDelegatedProfileCids = old
+}
+
 func TestNewnamestuff (t *testing.T) {
 	name, err := Crypter.getIPNSExpectNameFromPubkey(&commonIpfsTestKey.PublicKey)
 	require.Nil(t, err)
@@ -76,6 +86,19 @@ func TestNewnamestuff (t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, len(name), len(name2))
 	log.Print("name2: ", name2)
+
+	//these will need to be updated if you run this test against a new server.
+	currentServerDefaultKeyIpnsPublishName := "k2k4r8mxy2061c35it7o9m3igkqfl9qo9hk5nztrigmu3eq0apb8pva5" //discovered by trying to publish with no keyname and getting this back.
+	currentServerDefaultKeyOldstylePeerId := "QmXrsXeHJFW7k4G2EcfjTruASxC6Qzfad2FwA5nXVViHWc"
+	//lets see if that same value can be recovered from the config file key.
+	defaultName, err := Crypter.getIPNSExpectNameFromDefaultServerConfigKey()
+	require.Nil(t, err)
+	defaultNameOldFormat, err := Crypter.getOldStylePeerIdFromServerConfigKey()
+	require.Nil(t, err)
+	assert.Equal(t, currentServerDefaultKeyIpnsPublishName, defaultName)
+	assert.Equal(t, currentServerDefaultKeyOldstylePeerId, defaultNameOldFormat)
+	log.Printf("default keyname for this server as pulled from config file: %s", defaultName)
+	log.Printf("default keyname old format: %s", defaultNameOldFormat)
 }
 
 func Test_write_out_and_read_back_an_rsa_key__keys_match(t *testing.T) {
@@ -426,6 +449,7 @@ func Test_make_profile(t *testing.T) {
 
 	//this is where we can update our IPNS entry to point it to this latest profile cid.
 	//and of course, the server component would be able to take in an update much faster than IPNS
+	//IPNSName := IPFS.publishIPNSUpdate(profileCid, "test_key")
 	IPNSName := IPFS.publishIPNSUpdate(profileCid, "test_key")
 	// i already know the ipns for the hardcoded key i'm toying with is QmQFsV3XBtEoYnABnJLAey78LVx1Aexc7k3xtppVynv8RU
 	require.Equal(t, commonIpfsKeyProfileIdb36IPNSName, IPNSName )

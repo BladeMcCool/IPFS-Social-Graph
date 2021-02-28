@@ -15,7 +15,7 @@ services:
       - ./compose/ipfs0:/data/ipfs
       - ./ipfs_add_files:/export
     entrypoint: /sbin/tini
-    command: "-- /usr/local/bin/start_ipfs daemon --enable-pubsub-experiment --migrate=true"
+    command: "-- /usr/local/bin/start_ipfs daemon --enable-pubsub-experiment --enable-namesys-pubsub --migrate=true"
 
   ipfs2:
     container_name: ipfs2
@@ -28,5 +28,5 @@ services:
       - ./compose/ipfs2:/data/ipfs
       - ./ipfs2_add_files:/export
     entrypoint: /sbin/tini
-    command: "-- /usr/local/bin/start_ipfs daemon --enable-pubsub-experiment --migrate=true"
+    command: "-- /usr/local/bin/start_ipfs daemon --enable-pubsub-experiment --enable-namesys-pubsub --migrate=true"
 

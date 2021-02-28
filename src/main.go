@@ -26,6 +26,7 @@ func main() {
 		//these are each going to do IPNS stuff so dont want them running concurrently. (just seems to lead to context timeouts)
 		Federation.Init()
 		service.setupExtendedWl()
+		log.Printf("Federation DEB!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!UG331 %d", len(Federation.Members))
 		Federation.RunBackgroundUpdateFetcherProcessor()
 	}()
 	service.Start()
@@ -35,9 +36,13 @@ func initializers() {
 	IPFS.InitProfileCache()
 	Trash.prepareDumpsterToReceiveTrash()
 
-	IPNSDelegateName := IPFS.getIPNSDelegateName()
+	IPNSDelegateName, publishChannelName, err := IPFS.getIPNSDelegateName()
+	if err != nil {
+		panic(fmt.Sprintf("startup failure: %s", err.Error()))
+	}
 	Federation = IPNSDelegateFederation{
-		ipnsName: *IPNSDelegateName,
+		ipnsName: IPNSDelegateName,
+		publishChannelName: publishChannelName,
 		memberNames: getIPNSFederationMembernames(),
 		ipfs: IPFS,
 	}
@@ -50,7 +55,8 @@ var UtilityTimeline = &Timeline{
 
 var IPFS = &IPFSCommunicator{
 	shell: shell.NewShell(getIpfsApiServerConnectionInfo()),
-	IPNSDelegateKeyName: "ipnsdelegate2",
+	//IPNSDelegateExpectPublishName: Crypter.getIPNSExpectNameFromDefaultServerConfigKeyNoErr(),
+	//IPNSDelegateKeyName: "ipnsdelegate2",
 }
 var Crypter = &CryptoUtil{
 	ipfsKeystorePath: getIpfsKeystorePath(),

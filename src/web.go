@@ -330,7 +330,13 @@ func (s *APIService) unsignedProfileWithFirstPost(w http.ResponseWriter, r *http
 		Previous:    args.Previous,
 	}
 	if args.UseIPNSDelegate == true {
-		profile.IPNSDelegate = fakeTl.ipfs.getIPNSDelegateName()
+		_, ipnsDelegate, err := fakeTl.ipfs.getIPNSDelegateName()
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		profile.IPNSDelegate = &ipnsDelegate
 	}
 
 	serializedUnsignedProfile, err := json.Marshal(profile)
@@ -439,12 +445,12 @@ func (s *APIService) publishedProfileCid(w http.ResponseWriter, r *http.Request)
 }
 func (s *APIService) IPNSDelegateName(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	ipfsName := IPFS.getIPNSDelegateName()
-	if ipfsName == nil {
+	_, ipfsName, err := IPFS.getIPNSDelegateName()
+	if ipfsName == "" || err != nil {
 		w.Write([]byte("Not available"))
 		return
 	}
-	w.Write([]byte(*ipfsName))
+	w.Write([]byte(ipfsName))
 }
 func (s *APIService) peerId(w http.ResponseWriter, r *http.Request) {
 	//I figured out how to do this in the browser so its kind of deprecated now.

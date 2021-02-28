@@ -11,12 +11,12 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/gogo/protobuf/proto"
+	cserial "github.com/ipfs/go-ipfs-config/serialize"
 	ci "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/multiformats/go-multibase"
-
 	p2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	pb "github.com/libp2p/go-libp2p-core/crypto/pb"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multibase"
 	//"github.com/libp2p/go-libp2p-core/peer"
 	b58 "github.com/mr-tron/base58/base58"
 	//"github.com/multiformats/go-multibase"
@@ -211,7 +211,41 @@ func (cu *CryptoUtil)  getIPNSExpectNameFromPubkey(pubkey *rsa.PublicKey) (strin
 	if err != nil {
 		return "", err
 	}
-	peerIdObj, err := peer.IDFromPublicKey(pubAlternateFormat) //seems to actually a mh256 of the protobuf of the pkix output of the key.
+	return cu.getIPNSExpectNameFromCryptoPubkey(pubAlternateFormat)
+}
+
+func (cu *CryptoUtil)  getIPNSExpectNameFromDefaultServerConfigKeyNoErr() string {
+	name, err := cu.getIPNSExpectNameFromDefaultServerConfigKey()
+	if err != nil {
+		panic("could not get expected ipns name from server config key.")
+	}
+	return name
+}
+
+func (cu *CryptoUtil)  getIPNSExpectNameFromDefaultServerConfigKey() (string, error) {
+	privKeyCryptFmt, err := cu.getCryptoFmtPrivateKeyFromServerConfig()
+	defaultName, err := cu.getIPNSExpectNameFromCryptoPubkey(privKeyCryptFmt.GetPublic())
+	if err != nil { return "", err }
+	return defaultName, nil
+}
+
+func (cu *CryptoUtil)  getOldStylePeerIdFromServerConfigKey() (string, error) {
+	privKeyCryptFmt, err := cu.getCryptoFmtPrivateKeyFromServerConfig()
+	peerIdObj, err := peer.IDFromPublicKey(privKeyCryptFmt.GetPublic())
+	if err != nil { return "", err }
+	return peerIdObj.String(), nil
+}
+
+func (cu *CryptoUtil) getCryptoFmtPrivateKeyFromServerConfig() (p2pcrypto.PrivKey, error){
+	configFilePath := strings.Replace(cu.ipfsKeystorePath, "keystore", "config-v7", -1)
+	cfg, err := cserial.Load(configFilePath)
+	privKeyCryptFmt, err := cfg.Identity.DecodePrivateKey("")
+	if err != nil { return nil, err }
+	return privKeyCryptFmt.(p2pcrypto.PrivKey), nil
+}
+
+func (cu *CryptoUtil) getIPNSExpectNameFromCryptoPubkey(pubkey p2pcrypto.PubKey) (string, error) {
+	peerIdObj, err := peer.IDFromPublicKey(pubkey) //seems to actually a mh256 of the protobuf of the pkix output of the key.
 	if err != nil {
 		return "", err
 	}

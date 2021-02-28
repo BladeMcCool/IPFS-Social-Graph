@@ -18,6 +18,7 @@ import (
 type IPFSCommunicator struct {
 	shell *shell.Shell
 	IPNSDelegateKeyName string
+	IPNSDelegateExpectPublishName string
 }
 func(ic *IPFSCommunicator) makeKeyInIPFS(keyName string) error {
 	key, err := ic.shell.KeyGen(context.Background(), keyName, shell.KeyGen.Type("rsa"))
@@ -27,17 +28,31 @@ func(ic *IPFSCommunicator) makeKeyInIPFS(keyName string) error {
 	log.Printf("key made: %#v", key)
 	return nil
 }
-func (ic *IPFSCommunicator) getIPNSDelegateName() *string {
+func (ic *IPFSCommunicator) getIPNSDelegateName() (string, string, error) {
 	//make sure the "ipnsdelegate" key exists. this is just kind of hax for the moment to easily allow a profile owner to delegate ipns resolution for their profile to a different key that can publish updates on their behalf in a slightly different format.
 	//i imagine that the entries in the delegated lookup page will be a map[profileid]latestcidAndsignature
 	//keyname := "ipnsdelegate"
-	_ = ic.makeKeyInIPFS(ic.IPNSDelegateKeyName)
-	ipfsName, err := Crypter.getIPFSNameFromBinaryRsaKey(ic.IPNSDelegateKeyName)
-	if err != nil {
-		panic(err)
+
+	ipfsName := ""
+	legacyIpfsName := ""
+	var err error
+	if ic.IPNSDelegateKeyName == "" {
+		//just using the server default one. which i am switching to in order to match pubsub From field against federation member name.
+		ipfsName, err = Crypter.getIPNSExpectNameFromDefaultServerConfigKey()
+		legacyIpfsName, err = Crypter.getOldStylePeerIdFromServerConfigKey()
+		log.Printf("")
+	} else {
+		_ = ic.makeKeyInIPFS(ic.IPNSDelegateKeyName)
+		ipfsName, err = Crypter.getIPFSNameFromBinaryRsaKey(ic.IPNSDelegateKeyName)
+		legacyIpfsName = ipfsName
 	}
+	if err != nil {
+		return "", "", err
+	}
+
 	log.Printf("getIPNSDelegateName: determined a name of %s", ipfsName)
-	return &ipfsName
+	log.Printf("getIPNSDelegateName: determined a legacyIpfsName of %s", legacyIpfsName)
+	return ipfsName, legacyIpfsName, nil
 }
 
 func (ic *IPFSCommunicator) addContentToIPFS(data []byte) string {
@@ -56,8 +71,17 @@ func (ic *IPFSCommunicator) publishIPNSUpdate(cid, keyName string) string {
 	start := time.Now()
 	//keyFileName := Crypter.keystorePath + keyName
 	//var expectName, _ = Crypter.getIPFSNameFromBinaryRsaKey(keyName)
-	var expectName, _ = Crypter.getIPNSExpectNameFromBinaryRsaKey(keyName)
-	log.Printf("publishIPNSUpdate: new value for key %s / peer id %s: %s", keyName, expectName, cid)
+	var expectName string
+	var err error
+	if keyName == "" {
+		expectName = Federation.ipnsName
+	} else {
+		expectName, err = Crypter.getIPNSExpectNameFromBinaryRsaKey(keyName)
+		if err != nil {
+			return ""
+		}
+	}
+	log.Printf("publishIPNSUpdate: setting new value for name %s: %s on behalf of named key '%s'", expectName, cid, keyName)
 	resp, err := ic.shell.PublishWithDetails("/ipfs/"+ cid, keyName, time.Hour * 100, time.Second * 60, false)
 	if err != nil {
 		log.Println("publishIPNSUpdate: error", err)
@@ -70,19 +94,10 @@ func (ic *IPFSCommunicator) publishIPNSUpdate(cid, keyName string) string {
 	if resp.Name != expectName {
 		log.Fatalf("publishIPNSUpdate: got unexpected name back: %s -- expected to get %s", resp.Name, expectName)
 	}
-	log.Printf("publishIPNSUpdate: finished for %s after %.2f sec", keyName, time.Since(start).Seconds())
+	log.Printf("publishIPNSUpdate: finished publishing %s -> %s after %.2f sec (keyName: '%s')", resp.Name, cid, time.Since(start).Seconds(), keyName)
 	return expectName
 }
 
-func (ic *IPFSCommunicator) checkCachedProfileIds(profileId string) (string, bool) {
-	if profileCid, exists := CacheProfileCids.Get(profileId); exists == true {
-		log.Printf("checkCachedProfileIds: profileId %s had a record in the cache: profileCid %s", profileId, profileCid)
-		return profileCid.(string), true
-	}
-
-	log.Printf("checkCachedProfileIds: profileId %s does not have a record in the cache.", profileId)
-	return "", false
-}
 func (ic *IPFSCommunicator) checkDelegatedIPNS(profileId string) (string, bool) {
 	profileCid := Federation.Get(profileId)
 	if profileCid != nil {
@@ -169,12 +184,21 @@ func (ic *IPFSCommunicator) getCidFileBytes(cid string) ([]byte, error) {
 
 var nonDelegateIPNSMutex sync.RWMutex
 //var cacheMutex sync.RWMutex
-var IPNSProfileCids = map[string]string{}
+var IPNSProfileCids = map[string]string{} //these would be ones that we are going to publish individual IPNS updates for, for people that gave us the keys to do so. except since IPNS publish appears slow and unparrelelizable, we should just not do this and stick with publishing the one IPNS record for the server alone
 //var CacheProfileCids = map[string]string{}
 var CacheProfileCids *ttlcache.Cache
 //CacheProfileCids =
 //CacheProfileCids.S
 //CacheProfileCids.SetTTL(time.Duration(24 * time.Hour))
+func (ic *IPFSCommunicator) checkCachedProfileIds(profileId string) (string, bool) {
+	if profileCid, exists := CacheProfileCids.Get(profileId); exists == true {
+		log.Printf("checkCachedProfileIds: profileId %s had a record in the cache: profileCid %s", profileId, profileCid)
+		return profileCid.(string), true
+	}
+
+	log.Printf("checkCachedProfileIds: profileId %s does not have a record in the cache.", profileId)
+	return "", false
+}
 
 func (ic *IPFSCommunicator) updateCacheEntry(profile *Profile, profileCid string) {
 	// I believe we should ONLY cache these when the update is made through our server.
@@ -184,6 +208,8 @@ func (ic *IPFSCommunicator) updateCacheEntry(profile *Profile, profileCid string
 
 func (ic *IPFSCommunicator) updateDelegateEntry(profile *Profile, profileCid string) {
 	Federation.Set(profile.Id, profileCid)
+	Federation.publishToSubscribers(profile.Id, profileCid)
+
 	log.Printf("updateDelegateEntry for %s, profile id %s to new profile cid %s", profile.DisplayName, profile.Id, profileCid)
 }
 func (ic *IPFSCommunicator) updateNonDelegateEntry(profile *Profile, profileCid string) {
