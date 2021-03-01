@@ -30,11 +30,28 @@ async function setIdentity(keyname) {
     privTextarea = document.getElementById("privkeyb64")
     privTextarea.innerHTML = identity["priv"]
 
+
     // if (!identity["profileid"]) {
     //     //this will happen from making a new one.
     //     console.log("figure out profileId")
     //     identity["profileid"] = await peerutil.peerid(identity["pub"])
     // }
+    let profileTipDataFromServer = undefined;
+    try {
+        profileTipDataFromServer = await profileBestTip(identity["profileid"])
+    } catch (e) {
+        console.log("failed to get best tip from server, oh well.")
+    }
+
+    if (profileTipDataFromServer && profileTipDataFromServer["ProfileCid"] && (profileTipDataFromServer["ProfileCid"] != identity["profiletip"])) {
+        console.log("we think these two are different:", profileTipDataFromServer["ProfileCid"], identity["profiletip"])
+        if (confirm("Server sent profile best tip cid of " + profileTipDataFromServer["ProfileCid"] + ", switch to that?")) {
+            identity["profiletip"] = profileTipDataFromServer["ProfileCid"]
+            identity["graphtip"] = profileTipDataFromServer["ProfileData"]["GraphTip"]
+            identity["dispname"] = profileTipDataFromServer["ProfileData"]["DisplayName"]
+            identity["bio"] = profileTipDataFromServer["ProfileData"]["Bio"]
+        }
+    }
 
     document.getElementById("dispname").value = identity["dispname"] ? identity["dispname"] : ""
     document.getElementById("bio").value = identity["bio"] ? identity["bio"] : ""
@@ -53,7 +70,7 @@ async function setIdentity(keyname) {
     focusPostText()
 
     latestTimelineTextsJson = await getLatestTimelineTexts(identity["pub"], identity["profiletip"])
-    console.log(latestTimelineTextsJson)
+    // console.log(latestTimelineTextsJson)
     displayTimelineTexts(latestTimelineTextsJson)
     try {
         await localforage.setItem('selectedIdentity', keyname);

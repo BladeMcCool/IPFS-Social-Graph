@@ -33,16 +33,16 @@ async function cancelCurrentHistoryRequest() {
 }
 
 
-async function getUnsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, followprofileid) {
-    if (pubkeyb64 == null || text == null) {
+async function getUnsignedGraphNodeForPost(pubkeyb64, payload) {
+    if (pubkeyb64 == null || payload["text"] == null) {
         console.log("get unsigned graphnode: no data - do nothing")
         return
     }
-    console.log("hrm1", previous)
-    if (!previous) {
-        previous = null
+    payload["pubkey"] = pubkeyb64
+    if (!payload["previous"]) {
+        payload["previous"] = null
     }
-    payload = {"pubkey":pubkeyb64, "text":text, "previous":previous, "inreplyto":inreplyto, "followprofileid":followprofileid}
+    // payload = {"pubkey":pubkeyb64, "text":text, "previous":previous, "inreplyto":inreplyto, "followprofileid":followprofileid}
     console.log("send get unsignedGraphNodeForPost payload like", JSON.stringify(payload))
     result = await makeRequest("POST", serviceBaseUrl + "/service/unsignedGraphNodeForPost", payload)
     return result
@@ -171,7 +171,7 @@ function makeRequest(method, url, payload, track) {
             });
         };
         if (payload != null) {
-            console.log("do json submit")
+            console.log("do json submit to "+ url + " with payload like ", payload)
             xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
             xhr.send(JSON.stringify(payload));
             return

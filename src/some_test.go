@@ -10,7 +10,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -571,6 +570,14 @@ func createChainOfPosts(t *testing.T) []*TLProfile {
 		IPNSDelegated: true,
 	})
 
+	sackvilleTl, err := CreateTimelineWithFirstTextPost(&TLCreateProfileArgs{
+		DisplayName:   "Sackville Baggins",
+		Bio:           "Kinda scummy people",
+		FirstPostText: "Lets take Bilbos shit.",
+		TimeService:  timeService,
+		IPNSDelegated: true,
+	})
+
 
 	//Sam saw someone repost Frodo posting about rings and has something to say along with following him.
 	samPostTLGraphNode, err := samTl.NewTextPostGraphNode("Oh Mr. Frodo, I didn't know you were on here -- also I need a ring to propose with to Rosie")
@@ -586,7 +593,7 @@ func createChainOfPosts(t *testing.T) []*TLProfile {
 	//maybe gandalf should follow smeagol though.
 
 	frodoFollowsSamGraphNode := frodoTl.NewTLGraphNode()
-	frodoFollowsSamGraphNode.AddPublicFollow([]string{samTl.profileId, gandalfTl.profileId, bilboTl.profileId})
+	frodoFollowsSamGraphNode.AddPublicFollow([]string{samTl.profileId, gandalfTl.profileId, bilboTl.profileId, sackvilleTl.profileId, "QmWVyRwKj24xxxxxxxxxxxxxxxxxxxxxxxxxxgYZqU4kXX"})
 	frodoTl.PublishGraphNode(frodoFollowsSamGraphNode)
 	frodoProfileCid := frodoTl.profile.cid
 	t.Logf("frodo profile, updated cid: %s", frodoProfileCid)
@@ -604,6 +611,11 @@ func createChainOfPosts(t *testing.T) []*TLProfile {
 	smeagolTl.PublishGraphNode(smeagolPostTLGraphNode)
 
 	//TODO: gandalf should RP smeagols post so that frodo can see it, then frodo can engage further with that.
+		//RP without post.
+	gandalfRpGollumGraphNode := gandalfTl.NewTLGraphNode()
+	gandalfRpGollumGraphNode.SetAsRepostOf(smeagolPostTLGraphNode.cid)
+	gandalfTl.PublishGraphNode(gandalfRpGollumGraphNode)
+
 
 	bilboTlPostTLGraphNode, err := bilboTl.NewTextPostGraphNode("Nephew, delete this!") // <-- which is funny because while we will be able to rewrite history or publish retractions, we can't stop anyone from archiving and preserving old cids that we wish we had not created
 	bilboTlPostTLGraphNode.SetAsReplyTo([]string{frodoPostGraphNodeCid})
@@ -615,6 +627,15 @@ func createChainOfPosts(t *testing.T) []*TLProfile {
 	bilboTlPostTLGraphNode.SetAsReplyTo([]string{samPostTLGraphNode.cid})
 	bilboTl.PublishGraphNode(bilboTlPostTLGraphNode)
 
+	// Frodo sees Bilbo's directive to delete the post about the ring.
+	frodoRetractsRingPostGraphNode := frodoTl.NewTLGraphNode()
+	frodoRetractsRingPostGraphNode.AddRetraction(frodoPostGraphNodeCid)
+	frodoRetractsRingPostGraphNode.AddPublicUnfollow([]string{sackvilleTl.profileId})
+	frodoTl.PublishGraphNode(frodoRetractsRingPostGraphNode)
+	frodoProfileCid = frodoTl.profile.cid
+	t.Logf("frodo profile, updated cid after retraction and unfollow of sackville: %s", frodoProfileCid)
+
+
 	t.Logf("publishing frodo and sam latest profile info to their respective IPNS...")
 	//var wg sync.WaitGroup
 	ipnsToPublish := []*TLProfile{
@@ -623,6 +644,7 @@ func createChainOfPosts(t *testing.T) []*TLProfile {
 		gandalfTl.profile,
 		smeagolTl.profile,
 		bilboTl.profile,
+		sackvilleTl.profile,
 	}
 
 	for _, profile := range ipnsToPublish {
@@ -643,16 +665,16 @@ func createChainOfPosts(t *testing.T) []*TLProfile {
 
 func readBackChainOfPosts(t *testing.T, createdProfileInfo []*TLProfile) {
 	//needs to do it in a way using ipns delegate federation as we put the cids in there only, trying to avoid ipns in tests except for basic smokte test.
-	for _, name := range []string{
-		"bilbo-baggins",
-		"frodo-baggins",
-		"gandalf-the-grey",
-		"gollum",
-		"samwise-gamgee",
-	} {
-		privateKey, _ := Crypter.readBinaryIPFSRsaKey(name)
-		t.Logf("keyname: %s profileId %s", name, Crypter.getPeerIDBase58FromPubkey(&privateKey.PublicKey))
-	}
+	//for _, name := range []string{
+	//	"bilbo-baggins",
+	//	"frodo-baggins",
+	//	"gandalf-the-grey",
+	//	"gollum",
+	//	"samwise-gamgee",
+	//} {
+	//	privateKey, _ := Crypter.readBinaryIPFSRsaKey(name)
+	//	t.Logf("keyname: %s profileId %s", name, Crypter.getPeerIDBase58FromPubkey(&privateKey.PublicKey))
+	//}
 	//panic("nope")
 
 	//going to start with frodo, so need to figure frodos profile id we created
@@ -691,19 +713,24 @@ func readBackChainOfPosts(t *testing.T, createdProfileInfo []*TLProfile) {
 		log.Println(text)
 	}
 
-	require.Equal(t, 11, len(frodoTimelineAsText))
+	require.Equal(t, 13, len(frodoTimelineAsText))
 	nextLine := func() string {
 		var line string
 		line, frodoTimelineAsText = frodoTimelineAsText[0], frodoTimelineAsText[1:]
 		return line
 	}
+	assert.Regexp(t, "Gandalf.*Gollum.*Thief", nextLine())
+	//assert.Regexp(t, "Sackville.*Lets take Bilbos shit", nextLine()) <-- unfollowed.
 	assert.Regexp(t, "Bilbo.*and I got back again", nextLine())
 	assert.Regexp(t, "Gandalf.*to the Shire", nextLine())
 	assert.Regexp(t, "Sam.*tending my garden", nextLine())
 	assert.Regexp(t, "Follow of Samwise", nextLine())
 	assert.Regexp(t, "Follow of Gandalf", nextLine())
 	assert.Regexp(t, "Follow of Bilbo", nextLine())
-	assert.Regexp(t, "Frodo.*My Uncle has a magical ring.", nextLine())
+	//assert.Regexp(t, "Follow of Sackville", nextLine()) <-- goes away due to unfollow.
+	assert.Regexp(t, "Follow of profileId QmWVyRwKj24xxx", nextLine())
+	assert.Regexp(t, "Frodo.*Retracted", nextLine())
+	//assert.Regexp(t, "Frodo.*My Uncle has a magical ring.", nextLine())
 	assert.Regexp(t, "\tSamwise.*ring to propose", nextLine())
 	assert.Regexp(t, "\t\tGandalf.*have to talk", nextLine())
 	assert.Regexp(t, "\t\tBilbo.*even think", nextLine())
@@ -1056,3 +1083,29 @@ func wgTipLookerUpper(t *testing.T, wg *sync.WaitGroup, tlProfile *TLProfile) {
 }
 
 
+func TestDebugProfileIssue(t *testing.T) {
+	//initializers()
+	Federation.Init()
+	//profileId := "QmbweKMsBAjrQW83ipwR8yUtQGT3j1G1km1ajNDqPvBepo"
+	//profileTip := "QmXDx1BfwEG89C5dEL6o9v8p5rNepFEdR4EVnM54NA6Baq"
+	profileId := "QmNMLj7t8VzxmSs7K3NxuvJmGD3JjBcH48KujDk9n7GPbj"
+	profileTip :="QmbnBmWNJ1qUiaXE7TTVmYrWQCAqYVgtXL1sc1itknFQNt"
+
+	fakeTl := &Timeline{ //just for util funcs ... maybe they dont belong where they are
+		crypter:   Crypter,
+		ipfs:      IPFS,
+		profileId: profileId,
+	}
+	var err error
+	fakeTl.profile, err = fakeTl.fetchCheckProfile(fakeTl.profileId, &profileTip)
+	require.Nil(t, err)
+	 //= profile
+	err = fakeTl.LoadHistory()
+	require.Nil(t, err)
+	out := fakeTl.generateTextTimeline()
+	require.Nil(t, err)
+	for _, line := range out {
+		log.Print(line)
+	}
+	//_ = profile
+}

@@ -154,6 +154,11 @@ type CreateProfileJsonArgs struct {
 	Previous *string `json: "previous,omitempty"`
 	InReplyTo *string `json: "inreplyto,omitempty"`
 	FollowProfileId *string `json: "followprofileid,omitempty"`
+	UnfollowProfileId *string `json: "unfollowprofileid,omitempty"`
+	LikeOfNodeCid *string `json: "likeofnodecid,omitempty"`
+	UnlikeOfNodeCid *string `json: "unlikeofnodecid,omitempty"`
+	RetractionOfNodeCid *string `json: "retractionofnodecid,omitempty"`
+	RepostOfNodeCid *string `json: "repostofnodecid,omitempty"`
 }
 func (s *APIService) unsignedGraphNodeForPost(w http.ResponseWriter, r *http.Request) {
 	//bodyall, err := ioutil.ReadAll(r.Body)
@@ -198,6 +203,15 @@ func (s *APIService) unsignedGraphNodeForPost(w http.ResponseWriter, r *http.Req
 	}
 	if args.FollowProfileId != nil && *args.FollowProfileId != "" {
 		graphNode.PublicFollow = []string{*args.FollowProfileId} //just one for now this way for follows as well.
+	}
+	if args.UnfollowProfileId != nil && *args.UnfollowProfileId != "" {
+		graphNode.PublicUnfollow = []string{*args.UnfollowProfileId} //just one for now this way for follows as well.
+	}
+	if args.RetractionOfNodeCid != nil && *args.RetractionOfNodeCid != "" {
+		graphNode.RetractionOfNodeCid = args.RetractionOfNodeCid
+	}
+	if args.RepostOfNodeCid != nil && *args.RepostOfNodeCid != "" {
+		graphNode.RepostOfNodeCid = args.RepostOfNodeCid
 	}
 	serializedGraphNode, err := json.Marshal(graphNode)
 	if err != nil {
@@ -531,7 +545,11 @@ func (s *APIService) profileBestTip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profileCidPtr := Federation.Get(args.ProfileId)
+	// check cache before federation
+	profileCidPtr, _ := IPFS.determineProfileCid(args.ProfileId)
+	if profileCidPtr == nil {
+		profileCidPtr = Federation.Get(args.ProfileId)
+	}
 	if profileCidPtr == nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusNotFound)

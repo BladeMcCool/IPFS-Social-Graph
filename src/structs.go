@@ -22,7 +22,15 @@ type GraphNode struct {
 	ProfileId string //also the IPNS name for this profile, were it to be published there.
 	//// OOOOR maybe the profileid should be the ipns name ?? that is also a effectively a hash of the pubkey, and why not just use it then it is a universal key which could resolve via ipns or other means.
 	Post *Post `json:"post,omitempty"`
+
+	RetractionOfNodeCid *string `json: "retraction,omitempty"`
+	RepostOfNodeCid *string `json: "repost,omitempty"`
+
 	PublicFollow []string `json:"publicfollow,omitempty"`
+	PublicUnfollow []string `json:"publicufollow,omitempty"`
+	PublicLike []string `json:"publiclike,omitempty"`
+	PublicUnlike []string `json:"publicunlike,omitempty"`
+
 	Signature []byte
 	// maybe the date belongs up in here
 	// also anyone could just lie about the date so maybe
@@ -42,10 +50,24 @@ func (gn *GraphNode) SetAsReplyTo(replyTo []string) *GraphNode {
 	gn.Post.Reply = replyTo
 	return gn
 }
+func (gn *GraphNode) SetAsRepostOf(repostOfCid string) *GraphNode {
+	gn.RepostOfNodeCid = &repostOfCid
+	return gn
+}
 func (gn *GraphNode) AddPublicFollow(publicFollow []string) *GraphNode  {
 	gn.PublicFollow = publicFollow
 	return gn
 }
+func (gn *GraphNode) AddPublicUnfollow(publicUnfollow []string) *GraphNode  {
+	gn.PublicUnfollow = publicUnfollow
+	return gn
+}
+
+func (gn *GraphNode) AddRetraction(graphNodeCid string) *GraphNode  {
+	gn.RetractionOfNodeCid = &graphNodeCid
+	return gn
+}
+
 func (gn *GraphNode) Sign(privkey *rsa.PrivateKey, crypter HasherSigner) *GraphNode {
 	serializedGraphNode, err := json.Marshal(gn)
 	checkError(err)

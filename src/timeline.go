@@ -19,9 +19,11 @@ type TlGraphNode struct {
 	profile      *TLProfile
 	cid          string
 	replies      []*TlGraphNode
+	repostof     *TlGraphNode
 	previousNode *TlGraphNode
 	parentNode *TlGraphNode
 	PreviewText  string //TODO .. this maybe should be in the graphnode itself .... think about it
+	retracted bool
 }
 
 type TLProfile struct {
@@ -258,7 +260,7 @@ func (tl *Timeline) LoadHistory() error {
 	//we'd be interested in showing their posts and replies-to-us in our timeline too
 	interestedCidNodes:= map[string]*TlGraphNode{}
 	for _, tlGraphNode := range graphNodeHistory {
-		if tlGraphNode.Post == nil { continue }
+		if tlGraphNode.Post == nil && tlGraphNode.RepostOfNodeCid == nil { continue }
 		interestedCidNodes[tlGraphNode.cid] = tlGraphNode
 	}
 	followeeHistories := [][]*TlGraphNode{}
@@ -303,7 +305,7 @@ func (tl *Timeline) LoadHistory() error {
 				return
 			}
 			for _, tlGraphNode := range followeeGraphNodeHistory {
-				if tlGraphNode.Post == nil { continue }
+				if tlGraphNode.Post == nil && tlGraphNode.RepostOfNodeCid == nil{ continue }
 				interestedCidNodes[tlGraphNode.cid] = tlGraphNode
 			}
 			queue <- tlFolloweeWithHistory{
@@ -319,6 +321,7 @@ func (tl *Timeline) LoadHistory() error {
 				tl.profile.follows[t.profileId] = t.profile
 				followeeHistories = append(followeeHistories, t.history)
 			} else {
+				tl.profile.follows[t.profileId] = nil
 				//log.Printf("%#v", t)
 				log.Printf("error from fetching followed profile %s: %s", t.profileId, t.error.Error())
 			}
@@ -353,14 +356,17 @@ func (tl *Timeline) LoadHistory() error {
 	log.Printf("LoadHistory: fetched followee histories for %s by %.2f sec", tl.profile.DisplayName, time.Since(start).Seconds())
 
 	//tl.history = graphNodeHistory
-	tl.insertReplies(interestedCidNodes, graphNodeHistory)
-	for _, followeeGraphNodeHistory := range followeeHistories {
-		tl.history = append(tl.history, followeeGraphNodeHistory...)
-		tl.insertReplies(interestedCidNodes, followeeGraphNodeHistory)
+	//tl.insertReplies(interestedCidNodes, graphNodeHistory)
+	allHistories := append(followeeHistories, graphNodeHistory)
+	for _, singleProfileGraphNodeHistory := range allHistories {
+		//tl.history = append(tl.history, followeeGraphNodeHistory...)
+		tl.insertReplies(interestedCidNodes, singleProfileGraphNodeHistory)
+		tl.insertRetractions(interestedCidNodes, singleProfileGraphNodeHistory)
 	}
+
 	//log.Printf("LoadHistory: inserted replies by %.2f sec", time.Since(start).Seconds())
 
-	tl.organizeHistory(append(followeeHistories, graphNodeHistory))
+	tl.organizeHistory(allHistories)
 	log.Printf("LoadHistory: organized and completed for %s by %.2f sec", tl.profile.DisplayName, time.Since(start).Seconds())
 
 	knownFollowers := []string{} //one way to populate some of this is if anyone we follow follows us back.
@@ -473,17 +479,44 @@ func (tl *Timeline) insertReplies(nodesByCid map[string]*TlGraphNode, followeeGr
 
 }
 
+
+func (tl *Timeline) insertRetractions(nodesByCid map[string]*TlGraphNode, followeeGraphNodeHistory []*TlGraphNode) {
+	for _, e := range followeeGraphNodeHistory {
+		if e.RetractionOfNodeCid == nil { continue }
+		retractedNode, found := nodesByCid[*e.RetractionOfNodeCid]
+		if !found { continue }
+		if retractedNode.ProfileId != e.ProfileId { continue }
+		retractedNode.retracted = true
+		retractedNode.PreviewText = "[Retracted]"
+	}
+}
+
+
 func (tl *Timeline) extractFollowsProfileCids(history []*TlGraphNode) []string {
-	follows := []string{}
+	follows := map[string]bool{}
+	unfollows := map[string]bool{}
 	for _, e := range history {
-		if e.PublicFollow == nil {
+		if e.PublicFollow == nil && e.PublicUnfollow == nil {
 			continue
 		}
+		for _, unfollowCid := range e.PublicUnfollow {
+			_, followedMoreRecently := follows[unfollowCid]
+			if followedMoreRecently { continue }
+			unfollows[unfollowCid] = true
+		}
 		for _, followCid := range e.PublicFollow {
-			follows = append(follows, followCid)
+			_, unFollowedMoreRecently := unfollows[followCid]
+			if unFollowedMoreRecently { continue }
+			follows[followCid] = true
+			//_, unfollowed := unfollows
+			//follows = append(follows, followCid)
 		}
 	}
-	return follows
+	finalFollows := []string{}
+	for followCid, _ := range follows {
+		finalFollows = append(finalFollows, followCid)
+	}
+	return finalFollows
 }
 
 func (tl *Timeline) fetchGraphNodeHistory(profile *TLProfile) ([]*TlGraphNode, error) {
@@ -514,6 +547,19 @@ func (tl *Timeline) fetchGraphNodeHistory(profile *TLProfile) ([]*TlGraphNode, e
 		}
 		if currentGraphNode.Post != nil {
 			tlGraphNode.PreviewText, err = tl.createPostPreview(currentGraphNode.Post)
+			if err != nil {
+				tlGraphNode.PreviewText += " (error)"
+			}
+		}
+		if currentGraphNode.RepostOfNodeCid != nil {
+			separator := ""
+			if currentGraphNode.Post != nil { separator = " " }
+			repostPreview, repostTlGn, err := tl.createRePostPreview(*currentGraphNode.RepostOfNodeCid)
+			if err != nil {
+				repostPreview += " (error)"
+			}
+			tlGraphNode.PreviewText += separator + "[:::REPOST:::] " + repostPreview
+			tlGraphNode.repostof = repostTlGn
 		}
 		if lastIterTlGraphNode != nil {
 			lastIterTlGraphNode.previousNode = tlGraphNode
@@ -571,33 +617,59 @@ type HistoryMessage struct {
 	DisplayName string
 	Date JSONTime
 	PreviewText string
+	RepostOf *GraphNode `json: "RepostOf,omitempty"`
+	Retracted bool  `json: ",omitempty"`
 }
 func (tl  *Timeline) generateTimeline() []*HistoryMessage {
 	entriesOfInterest := []*HistoryMessage{}
+	//retractions := tl.getRetractions()
 	for _, e := range tl.History() {
+		isReplyableMainTimelineEntry := false
 		if e.Post != nil && e.Post.Reply == nil {
-			entriesOfInterest = append(entriesOfInterest, &HistoryMessage{
+			isReplyableMainTimelineEntry = true
+		}
+		if e.RepostOfNodeCid != nil {
+			isReplyableMainTimelineEntry = true
+		}
+
+		//if e.Post != nil && e.Post.Reply == nil {
+		if isReplyableMainTimelineEntry {
+
+			historyMessage := &HistoryMessage{
 				GraphNode:   e.GraphNode,
 				Cid:         e.cid,
 				Indent:      0,
 				DisplayName: e.profile.DisplayName,
-				Date:        e.Post.Date,
+				Date:        JSONTime{},
 				PreviewText: e.PreviewText,
-			})
+			}
+			if e.Post != nil {
+				historyMessage.Date = e.Post.Date
+			} else if e.RepostOfNodeCid != nil && e.repostof != nil && e.repostof.Post != nil {
+				historyMessage.Date = e.repostof.Post.Date
+			}
+			entriesOfInterest = append(entriesOfInterest, historyMessage)
+			if e.repostof != nil {
+				historyMessage.RepostOf = e.repostof.GraphNode
+			}
+			if e.retracted {
+				historyMessage.Retracted = true
+			}
 			//timelineStrs = append(timelineStrs, fmt.Sprintf("%s: %s", e.profile.DisplayName, e.PreviewText))
 			if e.replies != nil {
 				//log.Printf("generateTimeline: add replies under Post thing by %s", e.profile.DisplayName)
 				entriesOfInterest = append(entriesOfInterest, getReplyNodes(e, 1)...)
 			}
 		}
-		if e.PublicFollow != nil {
+		if (e.PublicFollow != nil) && (e.ProfileId == tl.profileId) {
 			for _, pfProfileId := range e.PublicFollow {
 				//do i care about follows done by people that are not me? at the moment lets say no
 				//also, there is a real chance that someone i follow goes and follows someone i dont, in which case i wont have the display info unless we collect info about followees of followees etc
-				if e.ProfileId != tl.profileId { continue }
+				//if e.ProfileId != tl.profileId { continue }
 
 				followeeProfile, found := tl.profile.follows[pfProfileId]
-				if !found || followeeProfile == nil {
+				if !found { continue }
+				if followeeProfile == nil {
 					log.Printf("generateTimeline: no profile info available for followee %s", pfProfileId)
 					followeeProfile = &TLProfile{
 						Profile: &Profile {
@@ -685,7 +757,30 @@ func (tl *Timeline) createPostPreview(post *Post) (string, error) {
 	//return datestr + " " + postText, nil
 	return postText, nil
 }
+func (tl *Timeline) createRePostPreview(nodeCid string) (string, *TlGraphNode, error) {
+	gn, err := tl.fetchGraphNodeFromIPFS(nodeCid)
+	if err != nil { return err.Error(), nil, err }
+	if gn.Post == nil {
+		return "-", nil, errors.New("No Post")
+	}
+	reposteeProfile, err := tl.fetchCheckProfile(gn.ProfileId, nil)
+	if err != nil { return err.Error(), nil, err }
+	if reposteeProfile == nil {
+		return "?", nil, errors.New("No Profile")
+	}
+	tlGn := &TlGraphNode{
+		GraphNode: gn,
+		profile: reposteeProfile,
+	}
 
+	repostPreview, err := tl.createPostPreview(gn.Post)
+	if reposteeProfile == nil {
+		return "!", tlGn, errors.New("No Post Content")
+	}
+	tlGn.PreviewText = repostPreview
+	return reposteeProfile.DisplayName + ": " + repostPreview, tlGn, nil
+
+}
 
 func (tl *Timeline) fetchGraphNodeFromIPFS(cid string) (*GraphNode, error){
 	graphNodeBytes, err := IPFS.getCidFileBytes(cid)
