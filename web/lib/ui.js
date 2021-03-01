@@ -251,8 +251,8 @@ function displayTimelineTexts(textsJson) {
                 addReplyButton(ptag, node["Cid"])
 
                 addRepostButton(ptag, node)
-                addLikeButton(ptag, node["Cid"])
-                addUnlikeButton(ptag, node["Cid"])
+                // addLikeButton(ptag, node["Cid"])
+                // addUnlikeButton(ptag, node["Cid"])
             }
         }
 
