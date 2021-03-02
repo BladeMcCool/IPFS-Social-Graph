@@ -356,7 +356,7 @@ func (df *IPNSDelegateFederation) publishToSubscribers(profileId, profileCid str
 		return
 	}
 	err = df.ipfs.shell.PubSubPublish(df.publishChannelName, string(bytes))
-	log.Printf("publishToSubscribers: just published %d bytes to %s", len(bytes), df.ipnsName)
+	log.Printf("publishToSubscribers: just published %d bytes to %s", len(bytes), df.publishChannelName)
 	if err != nil {
 		log.Printf("publishToSubscribers: err doing ipfs PubSubPublish: %s", err.Error())
 		return

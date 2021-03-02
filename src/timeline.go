@@ -207,7 +207,7 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 		follows: map[string]*TLProfile{},
 		cid: *profileCid,
 	}
-	log.Printf("fetchCheckProfile to fetch profile id %s got raw profile bytes as string: %s", profileId, string(profileBytes))
+	//log.Printf("fetchCheckProfile to fetch profile id %s got raw profile bytes as string: %s", profileId, string(profileBytes))
 	err = json.Unmarshal(profileBytes, profile)
 	if err != nil {
 		return nil, err

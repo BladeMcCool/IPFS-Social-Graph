@@ -28,18 +28,26 @@ This is an experimental proof of concept, to verify if the idea works and if IPF
   
   
 ### Build / run 
-Prequisites: Golang 1.15.6 or compatible, Docker or existing IPFS node.
+Prequisites: Docker compose for quick start, or Golang 1.15.6 or compatible + Docker or existing IPFS node.
 
 Below are using example paths for the project and go resource directories. You will need to fix according to your system. Below we will start an IPFS node which will listen for API on port 7767, get dependencies for the golang project, build the ciddag binary from source using golang 1.15.6 and then run it set to provide a ui via http on port 4589, and to communicate with the running IPFS node on its port 7767   
 
+Quick start (replace your CIDDAG_WL_PROFILEIDS and CIDDAG_IPNS_FEDERATIONMEMBERS with correct values):
+    
+    cd /home/blademccool/IPFS-Social-Graph/
+    COMPOSE_FILE=docker-compose.base.yml make build
+    COMPOSE_FILE=docker-compose.base.yml CIDDAG_WL_PROFILEIDS="QmNMLj7t8VzxmSs7K3xxxxxxxxxxxxxxxxxxxxxxxxxxxj,QmYxxxxxxxxxxxxxxxxxxxxxxEvVMiD5eZMSvuHBwqVXTG" CIDDAG_IPNS_FEDERATIONMEMBERS="QmZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxDgL9jPvb4VBh" make up
+
+##### Other way
+
 Start IPFS node:
     
-    cd /home/blademccool/ciddag/;
+    cd /home/blademccool/IPFS-Social-Graph/;
     COMPOSE_FILE=docker-compose.base.yml docker-compose up -d ipfs0
 
 Build:
 
-    cd /home/blademccool/ciddag/src;
+    cd /home/blademccool/IPFS-Social-Graph/src;
     GOROOT=/home/blademccool/sdk/go1.15.6 GOPATH=/home/blademccool/go /home/blademccool/sdk/go1.15.6/bin/go get -u ./...;
     GOROOT=/home/blademccool/sdk/go1.15.6 GOPATH=/home/blademccool/go /home/blademccool/sdk/go1.15.6/bin/go build -i -o ciddag .  
 
@@ -54,7 +62,7 @@ Symlink for project code in go: If there are issues building, please try creatin
 
 Re-Bundling js (if desired):
 
-    cd /home/blademccool/ciddag/web
+    cd /home/blademccool/IPFS-Social-Graph/web
     browserify peerutil.js -r -s peerutil -o lib/peerutil.bundle.js
     
     

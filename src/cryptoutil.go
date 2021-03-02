@@ -172,11 +172,16 @@ func (cu *CryptoUtil)  getIPFSNameFromBinaryRsaKey(fileName string) (string, err
 	buffer := bufio.NewReader(privateKeyFile)
 	_, err = buffer.Read(rawbytes)
 	ipfsKey, err := ci.UnmarshalPrivateKey(rawbytes)
-	checkError(err)
+	if err != nil { return "", err }
 
 	pubBytes, err := ipfsKey.GetPublic().Bytes()
-	checkError(err)
-	hash, _ := mh.Sum(pubBytes, mh.SHA2_256, -1)
+	if err != nil { return "", err }
+
+	var alg uint64 = mh.SHA2_256
+	if len(pubBytes) <= 42 {
+		alg = mh.ID
+	}
+	hash, _ := mh.Sum(pubBytes, alg, -1)
 	peerID := b58.Encode(hash)
 	return peerID, nil
 }
@@ -273,11 +278,16 @@ func (cu *CryptoUtil)  getIPNSExpectNameFromBinaryRsaKey(fileName string) (strin
 	buffer := bufio.NewReader(privateKeyFile)
 	_, err = buffer.Read(rawbytes)
 	ipfsKey, err := ci.UnmarshalPrivateKey(rawbytes)
-	checkError(err)
+	if err != nil { return "", err }
 
 	pubBytes, err := ipfsKey.GetPublic().Bytes()
-	checkError(err)
-	hash, _ := mh.Sum(pubBytes, mh.SHA2_256, -1)
+	if err != nil { return "", err }
+
+	var alg uint64 = mh.SHA2_256
+	if len(pubBytes) <= 42 {
+		alg = mh.ID
+	}
+	hash, _ := mh.Sum(pubBytes, alg, -1)
 
 
 	cidv1 := peer.ToCid(peer.ID(hash))

@@ -64,7 +64,7 @@ func init() {
 	log.Println("test init complete")
 }
 
-func _TestReplacePublishedDelegateIPNSData(t *testing.T)  {
+func TestReplacePublishedDelegateIPNSData(t *testing.T)  {
 	//Federation.mutex.Lock()
 	//defer Federation.mutex.Unlock()
 	old := Federation.IPNSDelegatedProfileCids

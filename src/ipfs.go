@@ -151,10 +151,18 @@ func (ic *IPFSCommunicator) getCidFileBytes(cid string) ([]byte, error) {
 		return nil, errors.New(fmt.Sprintf("cid %s is marked as trash", cid))
 	}
 
-	resp, err := ic.shell.Request("get", cid).Option("create", true).Send(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*90)
+	defer cancel()
+
+	resp, err := ic.shell.Request("get", cid).Option("create", true).Send(ctx)
+	if resp == nil {
+		log.Printf("getCidFileBytes nil resp: %s", err.Error())
+		return nil, err
+	}
 	defer resp.Close()
 	if err != nil {
-		Trash.throwItIn(cid)
+		//Trash.throwItIn(cid)
+		log.Printf("getCidFileBytes err: %s", err.Error())
 		return nil, err
 	}
 
