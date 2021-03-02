@@ -1,7 +1,11 @@
 version: '3.4'
 
-x-variables: &environment
-  var1: 'pork barrel'
+x-variables: &ciddag-variables
+  CIDDAG_HTTP_PORT: "4588"
+  CIDDAG_IPFS_API_SERVER: "ipfs0:5001"
+  CIDDAG_IPFS_KEYSTORE_PATH: "/data/ipfs/keystore"
+  CIDDAG_WL_PROFILEIDS: "${CIDDAG_WL_PROFILEIDS}"
+  CIDDAG_IPNS_FEDERATIONMEMBERS: "${CIDDAG_IPNS_FEDERATIONMEMBERS}"
 
 services:
   ipfs0:
@@ -29,4 +33,22 @@ services:
       - ./ipfs2_add_files:/export
     entrypoint: /sbin/tini
     command: "-- /usr/local/bin/start_ipfs daemon --enable-pubsub-experiment --enable-namesys-pubsub --migrate=true"
+
+  ciddag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      <<: *ciddag-variables
+    volumes:
+      - ./compose/ipfs0:/data/ipfs
+    ports:
+      - "4588:4588"
+
+  wait_for_deps:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - ipfs0
+    command: ipfs0:5001
+
 

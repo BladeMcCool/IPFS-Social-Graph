@@ -237,7 +237,8 @@ func (cu *CryptoUtil)  getOldStylePeerIdFromServerConfigKey() (string, error) {
 }
 
 func (cu *CryptoUtil) getCryptoFmtPrivateKeyFromServerConfig() (p2pcrypto.PrivKey, error){
-	configFilePath := strings.Replace(cu.ipfsKeystorePath, "keystore", "config-v7", -1)
+	configFilePath := strings.Replace(cu.ipfsKeystorePath, "keystore", "config", -1)
+	log.Printf("getCryptoFmtPrivateKeyFromServerConfig: about to attempt to get data from file at: %s", configFilePath)
 	cfg, err := cserial.Load(configFilePath)
 	privKeyCryptFmt, err := cfg.Identity.DecodePrivateKey("")
 	if err != nil { return nil, err }
