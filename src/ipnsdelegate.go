@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -32,34 +33,35 @@ func (rf *IPNSResolverFetcher) ResolveFetch() (map[string]string, error){
 }
 func (rf *IPNSResolverFetcher) getCurrentDelegatedProfileCids(delegatedIPNSName string) (map[string]string, error) {
 	start := time.Now()
-	log.Printf("getCurrentDelegatedProfileCids ...")
+	log.Printf("getCurrentDelegatedProfileCids from ipns name %s ... ", delegatedIPNSName)
 	currentListCid, err := rf.ipfs.resolveIPNS(delegatedIPNSName)
 	if err != nil && err.Error() != "name/resolve: context deadline exceeded" {
 		log.Println(err)
 		return nil, err
 	}
-	log.Printf("getCurrentDelegatedProfileCids took %.2f sec to get delegatedIPNS profile list.", time.Since(start).Seconds())
+	log.Printf("getCurrentDelegatedProfileCids took %.2f sec to resolve ipnsdelegate name %s to cid %s, now must fetch content from that cid", time.Since(start).Seconds(), delegatedIPNSName, currentListCid)
 
-	currentList := map[string]string{}
-	if currentListCid != "" {
-		currentListBytes, err := rf.ipfs.getCidFileBytes(currentListCid)
-		if currentListBytes == nil {
-			log.Printf("actually got nothing for currentListBytes which shouldnt be a problem but ...")
-		}
-
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		err = json.Unmarshal(currentListBytes, &currentList)
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-	} else {
-		log.Printf("current list appears to not exist (no cid from ipns, so create new)")
+	if currentListCid == "" {
+		log.Printf("getCurrentDelegatedProfileCids list appears to not exist (no cid from ipns)")
+		return nil, errors.New("no cid found for list")
 	}
-	log.Printf("getCurrentDelegatedProfileCids took %.2f sec to complete", time.Since(start).Seconds())
+	currentList := map[string]string{}
+
+	currentListBytes, err := rf.ipfs.getCidFileBytes(currentListCid)
+	if currentListBytes == nil {
+		log.Printf("getCurrentDelegatedProfileCids: actually got nothing for currentListBytes which shouldnt be a problem but ...")
+	}
+
+	if err != nil {
+		log.Printf("getCurrentDelegatedProfileCids getCidFileBytes error: %s", err.Error())
+		return nil, err
+	}
+	err = json.Unmarshal(currentListBytes, &currentList)
+	if err != nil {
+		log.Printf("getCurrentDelegatedProfileCids json.Unmarshal error: %s", err.Error())
+		return nil, err
+	}
+	log.Printf("getCurrentDelegatedProfileCids got %d entries and took %.2f sec to complete", len(currentList), time.Since(start).Seconds())
 	return currentList, nil
 }
 
