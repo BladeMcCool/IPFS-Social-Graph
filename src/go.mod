@@ -18,6 +18,6 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect
 	go.opencensus.io v0.22.6 // indirect
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
+	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/sys v0.0.0-20210220050731-9a76102bfb43 // indirect
 )

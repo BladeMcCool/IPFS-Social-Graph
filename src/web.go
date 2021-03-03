@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"golang.org/x/crypto/acme/autocert"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -16,17 +21,34 @@ import (
 	"net/http"
 )
 type APIService struct {
-	TimeService TimeService
-	WlProfileIds map[string]bool
-	BaseWlProfileIds map[string]bool
-	WlProfileIdMutex sync.RWMutex
-	FilePathOverride string
-	ListenPort string
+	TimeService         TimeService
+	WlProfileIds        map[string]bool
+	BaseWlProfileIds    map[string]bool
+	WlProfileIdMutex    sync.RWMutex
+	FilePathOverride    string
+	ListenPort          string
 	BaseWlProfileIdList []string
+	TLSHostName         string
+	TLSDataDir string
 }
 //var WlProfileIds = map[string]bool{}
 //var WlProfileIdMutex = sync.RWMutex{}
 func (s *APIService) Start() {
+	if s.TLSHostName != "" && s.TLSDataDir != "" {
+		log.Printf("setting up for TLS Server ...")
+		s.StartTLSServer()
+	} else {
+		log.Printf("one or more of TLSHostName and TLSDataDir are not set, not setting up for TLS Server")
+		err := http.ListenAndServe(":"+s.ListenPort, s.getHttpHandler())
+		if err != nil {
+			panic(err)
+		}
+	}
+
+}
+
+func (s *APIService) getHttpHandler() http.Handler {
+
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, // All origins
 		AllowedMethods: []string{"GET","POST"},
@@ -53,12 +75,89 @@ func (s *APIService) Start() {
 	authedRouter.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET","POST")
 	authedRouter.HandleFunc("/history", s.history).Methods("POST")
 	authedRouter.HandleFunc("/profileBestTip", s.profileBestTip).Methods("POST")
+	return c.Handler(router)
+}
 
-	err := http.ListenAndServe(":"+s.ListenPort,  c.Handler(router))
+func (s *APIService) StartTLSServer() {
+
+	// Note: use a sensible value for data directory
+	// this is where cached certificates are stored
+	if _, err := os.Stat(s.TLSDataDir); os.IsNotExist(err) {
+		err = os.Mkdir(s.TLSDataDir, 0644)
+		if err != nil {
+			panic(err)
+		}
+	}
+	log.Printf("addTLSServer: TLSHostName is %s, TLSDataDir is %s", s.TLSHostName, s.TLSDataDir)
+	hostPolicy := func(ctx context.Context, host string) error {
+		// Note: change to your real domain
+		allowedHost := s.TLSHostName
+		log.Printf("APIServer addTLSServer: setting up letsencrypt hostpolicy for %s", s.TLSHostName)
+		if host == allowedHost {
+			return nil
+		}
+		return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
+	}
+
+	httpsSrv := &http.Server{
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		Handler:      s.getHttpHandler(),
+	}
+	//httpsSrv = makeHTTPServer()
+	m := &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: hostPolicy,
+		Cache:      autocert.DirCache(s.TLSDataDir),
+	}
+
+	httpsSrv.Addr = ":443"
+	httpsSrv.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
+	go func() {
+		log.Println("addTLSServer: about to ListenAndServeTLS")
+		err := httpsSrv.ListenAndServeTLS("", "")
+		if err != nil {
+			panic(err)
+		}
+	}()
+	log.Println("addTLSServer: about to add regular http handler such that it handles autocert stuff and redirects everything else to https")
+
+	regSrv := &http.Server{
+		Addr: ":80",
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		Handler:      m.HTTPHandler(forceHttps()),
+	}
+	err := regSrv.ListenAndServe()
 	if err != nil {
 		panic(err)
 	}
+
 }
+//func makeServerFromMux(mux *http.ServeMux) *http.Server {
+//	// set timeouts so that a slow or malicious client doesn't
+//	// hold resources forever
+//	return &http.Server{
+//		ReadTimeout:  5 * time.Second,
+//		WriteTimeout: 5 * time.Second,
+//		IdleTimeout:  120 * time.Second,
+//		Handler:      mux,
+//	}
+//}
+
+func forceHttps() *http.ServeMux {
+	handleRedirect := func(w http.ResponseWriter, r *http.Request) {
+		newURI := "https://" + r.Host + r.URL.String()
+		http.Redirect(w, r, newURI, http.StatusFound)
+	}
+	mux := &http.ServeMux{}
+	mux.HandleFunc("/", handleRedirect)
+	return mux
+}
+
+
 func (s *APIService) setupWl() {
 	for _, profileId := range s.BaseWlProfileIdList {
 		s.WlProfileIds[profileId] = true

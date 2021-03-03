@@ -12,11 +12,13 @@ import (
 func main() {
 	log.Printf("Starting IPFS Social Graph Server ...")
 	service := &APIService{
-		TimeService: &defaultTimeService{},
-		WlProfileIds: map[string]bool{},
-		BaseWlProfileIds: map[string]bool{},
-		WlProfileIdMutex: sync.RWMutex{},
-		ListenPort: getServiceHttpListenPort(),
+		TimeService:         &defaultTimeService{},
+		WlProfileIds:        map[string]bool{},
+		BaseWlProfileIds:    map[string]bool{},
+		WlProfileIdMutex:    sync.RWMutex{},
+		ListenPort:          getServiceHttpListenPort(),
+		TLSHostName:         getTLSHostName(),
+		TLSDataDir: getTLSDataDir(),
 		BaseWlProfileIdList: getWlBaseProfileIdList(),
 	}
 	initializers()
@@ -114,6 +116,20 @@ func getServiceHttpListenPort() string {
 		os.Exit(1)
 	}
 	return val
+}
+func getTLSHostName() string {
+	val, ok := os.LookupEnv("CIDDAG_TLS_HOSTNAME")
+	if ok {
+		return val
+	}
+	return ""
+}
+func getTLSDataDir() string {
+	val, ok := os.LookupEnv("CIDDAG_TLS_DATADIR")
+	if ok {
+		return val
+	}
+	return ""
 }
 
 func checkError(err error) {

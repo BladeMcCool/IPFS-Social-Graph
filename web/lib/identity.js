@@ -235,7 +235,7 @@ async function importKeyAsIdentity() {
     console.log("pubkey b64 in PKIX", spkib64)
     importPubkey = spkib64
 
-    profileId = await peerutil.peerid(identity["pub"])
+    profileId = await peerutil.peerid(importPubkey)
     console.log("trying to import profile with id:", profileId)
     ipnsDelegate = await IPNSDelegateName()
     console.log("trying to import profile .. got ipnsdelegate from the currently configured server:", ipnsDelegate)
