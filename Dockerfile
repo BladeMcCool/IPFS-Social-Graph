@@ -7,4 +7,6 @@ FROM golang:1.15.8-buster
  RUN go build -o ../ciddag
  WORKDIR /go/src/IPFS-Social-Graph/
  EXPOSE 4588
+ EXPOSE 80
+ EXPOSE 443
  CMD ["ciddag"]

@@ -47,6 +47,8 @@ services:
       - ./compose/tlsdata:/data/tls
     ports:
       - "4588:4588"
+      - "80:80"
+      - "443:443"
 
   wait_for_deps:
     image: dadarek/wait-for-dependencies
