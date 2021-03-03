@@ -15,8 +15,8 @@ services:
     image: ipfs/go-ipfs:v0.8.0
     ports:
      - "7766:4001" # ipfs swarm - expose if needed/wanted
-     - "7767:5001" # ipfs api - expose if needed/wanted
-     - "7768:8080" # ipfs gateway - expose if needed/wanted
+     # - "7767:5001" # ipfs api - expose if needed/wanted
+     # - "7768:8080" # ipfs gateway - expose if needed/wanted
     volumes:
       - ./compose/ipfs0:/data/ipfs
       - ./ipfs_add_files:/export

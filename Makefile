@@ -10,3 +10,7 @@ deps:
 build: COMPOSE_FILE=docker-compose.base.yml
 build:
 	docker-compose build ciddag
+
+ciddag: COMPOSE_FILE=docker-compose.base.yml
+ciddag:
+	docker-compose up -d ciddag

@@ -30,13 +30,13 @@ This is an experimental proof of concept, to verify if the idea works and if IPF
 ### Build / run 
 Prequisites: Docker compose for quick start, or Golang 1.15.6 or compatible + Docker or existing IPFS node.
 
-Below are using example paths for the project and go resource directories. You will need to fix according to your system. Below we will start an IPFS node which will listen for API on port 7767, get dependencies for the golang project, build the ciddag binary from source using golang 1.15.6 and then run it set to provide a ui via http on port 4589, and to communicate with the running IPFS node on its port 7767   
+Below are using example paths for the project and go resource directories. You will need to fix according to your system. Below we will start an IPFS node which will listen for API on port 7767, get dependencies for the golang project, build the ciddag binary from source using golang 1.15.6 and then run it set to provide a ui via http on port 4588, and to communicate with the running IPFS node on its port 7767. Leave the CIDDAG_TLS_HOSTNAME blank for local http ui on the port specified by CIDDAG_HTTP_PORT container environment var (default 4588). Set a value of a hostname that you control otherwise, and it will do automatic "Let's Encrypt" setup for the TLS cert for the domain. It will NOT WORK over https without a valid cert because otherwise the browser crypto key management api is unavailable.
 
 Quick start (replace your CIDDAG_WL_PROFILEIDS and CIDDAG_IPNS_FEDERATIONMEMBERS with correct values):
     
     cd /home/blademccool/IPFS-Social-Graph/
     COMPOSE_FILE=docker-compose.base.yml make build
-    COMPOSE_FILE=docker-compose.base.yml CIDDAG_WL_PROFILEIDS="QmNMLj7t8VzxmSs7K3xxxxxxxxxxxxxxxxxxxxxxxxxxxj,QmYxxxxxxxxxxxxxxxxxxxxxxEvVMiD5eZMSvuHBwqVXTG" CIDDAG_IPNS_FEDERATIONMEMBERS="QmZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxDgL9jPvb4VBh" make up
+    COMPOSE_FILE=docker-compose.base.yml CIDDAG_TLS_HOSTNAME=your.server.hostname CIDDAG_WL_PROFILEIDS="QmNMLj7t8VzxmSs7K3xxxxxxxxxxxxxxxxxxxxxxxxxxxj,QmYxxxxxxxxxxxxxxxxxxxxxxEvVMiD5eZMSvuHBwqVXTG" CIDDAG_IPNS_FEDERATIONMEMBERS="QmZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxDgL9jPvb4VBh" make up
 
 ##### Other way
 
