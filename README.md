@@ -9,7 +9,7 @@ To be able to communicate freely without having terms imposed.
   
 ### Own your data  
   
-If you run this and point it at an IPFS node that you control, then you own and control your data, up to the point that you give a copy of it freely to others, who may choose to archive it indefinitely. Anything you do or say on this social graph may stick around to haunt you. Protect your private key, it is your identity. If you lose it, you can no longer update your profile or social graph. If it is compromised, there is no authority that can intervene.  
+If you run this and point it at an IPFS node that you control, then you own and control your data, up to the point that you give a copy of it freely to others, who may choose to archive it indefinitely. Anything you do or say on this social graph may stick around to haunt you. Protect your private key, it is your identity. If you lose it, you can no longer update your profile or social graph. If it is compromised, there is no authority which can intervene.  
   
 ### RSA Cryptography (Sign/Verify primarily)  
   
@@ -17,18 +17,17 @@ Your identity is an RSA public key, which is derived from a RSA private key. Whe
   
 ### IPNS Publish limitations and security of Private Key  
   
-From my experience the js-ipfs library is not able to push our IPNS published records in a way that other IPFS nodes on the internet are able to resolve the names. In order for the server to publish an IPNS name on your behalf using your own peerId you are required to send the private key to the server. This is incredibly insecure. An alternative is to disable sending the private key and to delgate IPNS publishing to a server peerID which can publish a list of all the profile tip information. This delegated IPNS functionality is experimental and offers limited ability to obtain profile data as, at present, only the server maintaining the delegated list will be able to find the profile data in IPFS  
+From my experience the js-ipfs library is not able to push our IPNS published records in a way that other IPFS nodes on the internet are able to resolve the names. In order for the server to publish an IPNS name on your behalf using your own peerId you are required to send the private key to the server. This is incredibly insecure, and IPNS publish is too slow to allow this. So, the alternative is IPNS Delegated Federation, where the server will publish a list of profileId social graph tips on behalf of all clients in a single large list, and collect similar lists from other servers in the federation.  
   
 ### Notes on Anonymity   
 Your anonymity is up to you. I have made no effort to put services behind Tor or I2P or whatever. I have made no effort to encrypt any of the text produced by this code to be stored in IPFS. If your government is made up of terrorists then you will need to take your own steps to shroud your communication to any running instance of this server. Technically the only identifying information that a server requires to process your request is a whitelisted public RSA key. I would think that accessing this service via a Tor exit should sufficiently obfuscate your traffic origin.  
   
 ### Proof of Concept  
   
-This is an experimental proof of concept, to verify if the idea works and if IPFS delivers on its promises. Major concerns at present are the need to send private key to the server to do IPNS properly. Perhaps there are better solutions via pubsub or other techniques to share profileTip cid information around.  
-  
+This is an experimental proof of concept, to verify if the idea works and if IPFS delivers on its promises. It has also been written in haste, as time is apparently of the essence.
   
 ### Build / run 
-Prequisites: Docker compose for quick start, or Golang 1.15.6 or compatible + Docker or existing IPFS node.
+Prequisites: Docker compose for quick start, or Golang 1.15.6 or compatible + existing IPFS node.
 
 Below are using example paths for the project and go resource directories. You will need to fix according to your system. Below we will start an IPFS node which will listen for API on port 7767, get dependencies for the golang project, build the ciddag binary from source using golang 1.15.6 and then run it set to provide a ui via http on port 4588, and to communicate with the running IPFS node on its port 7767. Leave the CIDDAG_TLS_HOSTNAME blank for local http ui on the port specified by CIDDAG_HTTP_PORT container environment var (default 4588). Set a value of a hostname that you control otherwise, and it will do automatic "Let's Encrypt" setup for the TLS cert for the domain. It will NOT WORK over https without a valid cert because otherwise the browser crypto key management api is unavailable.
 
@@ -38,7 +37,7 @@ Quick start (replace your CIDDAG_WL_PROFILEIDS and CIDDAG_IPNS_FEDERATIONMEMBERS
     COMPOSE_FILE=docker-compose.base.yml make build
     COMPOSE_FILE=docker-compose.base.yml CIDDAG_TLS_HOSTNAME=your.server.hostname CIDDAG_WL_PROFILEIDS="QmNMLj7t8VzxmSs7K3xxxxxxxxxxxxxxxxxxxxxxxxxxxj,QmYxxxxxxxxxxxxxxxxxxxxxxEvVMiD5eZMSvuHBwqVXTG" CIDDAG_IPNS_FEDERATIONMEMBERS="QmZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxDgL9jPvb4VBh" make up
 
-##### Other way
+##### Manual build notes (if not doing docker-compose method above.)
 
 Start IPFS node:
     
@@ -70,12 +69,13 @@ Re-Bundling js (if desired):
 ### TODOs / ideas for the future   
  - Improve UI, ux, layout/design etc as well as the possibility to make use of the js-ipfs library to load cid data and move timeline assembly code from the server to the browser, which could make the experience much more dynamic!  
   
- - Delete / Retract posts. Since the history is published to anyone who cares to crawl it, there is no real concept of being able to permanently delete something however it should be trivial to republish your entire profile history back to the beginning and just leave out anything that you want to 'go away' from your current official timeline of posts. A retraction would operate not by trying to rewrite history but instead by adding a new entry flagging an old one as retracted. 'Edits' to existing posts could be published in a similar fashion just by using diffs and leave it to client code to assemble the current rendition of the text.
+ - Delete / ~~Retract posts.~~ [Impl] Since the history is published to anyone who cares to crawl it, there is no real concept of being able to permanently delete something however it should be trivial to republish your entire profile history back to the beginning and just leave out anything that you want to 'go away' from your current official timeline of posts. ~~A retraction would operate not by trying to rewrite history but instead by adding a new entry flagging an old one as retracted.~~ [Now Implemented] 'Edits' to existing posts could be published in a similar fashion just by using diffs and leave it to client code to assemble the current rendition of the text.
   
- - Federation of IPNS delegates. basically you'd just list peerIds of the federation members (peer id of their 'IPNS delegate' key) you want to join with, and it will collect all the profileid tip info published by the collective membership. Then it would be more practical to stop sending private key to server for IPNS purposes.  
+ - ~~Federation of IPNS delegates. basically you'd just list peerIds of the federation members (peer id of their 'IPNS delegate' key) you want to join with, and it will collect all the profileid tip info published by the collective membership.~~ [Now implemented -- including pubsub enhancement ]  
   
- - Repost function, which would be a profile making a post that references another post, this would let profiles in your graph expose you to profiles that are outside of it.  
- - 'Follow' button for the profileId shown in these reposts. The server would need to go collect profile info to present a display name etc on the reposted content, but could allow it to appear without that too i suppose.  
+ - ~~Repost function, which would be a profile making a post that references another post, this would let profiles in your graph expose you to profiles that are outside of it.~~ [Now implemented]
+   
+ - ~~'Follow' button for the profileId shown in these reposts. The server would need to go collect profile info to present a display name etc on the reposted content, but could allow it to appear without that too i suppose.~~ [Now implemented]   
   
  - Likes - which by the nature of the system would only be able to count up a total of likes done to your content by people in your social graph.  
   
@@ -91,7 +91,7 @@ Re-Bundling js (if desired):
   
  - Centralized portals? Where you would retain your private key for signing things in the browser client but the timeline presented to you is curated or managed by a service with terms. If you were unhappy with those terms at any point you could just go use an independent client or a different centralized portal using your keys. Centralized portals could even offer you the sacrifice of managing your keys for you, at the expense of you no longer truly owning your data. However for some people, this may be close to the the desired experience. Such centralized platforms could also possibly offer montetization paths.  
   
-### References (inspiration)  
+### Inspirational References  
   
 https://beyermatthias.de/blog/2017/10/31/blueprint-of-a-distributed-social-network-on-ipfs---and-its-problems/  
 https://carter.sande.duodecima.technology/decentralized-wishlist/  
@@ -107,20 +107,21 @@ I wanted a profile identity to be an RSA public key and to use digital signature
   
 The server is intended to allow you to publish IPNS updates and otherwise cache profile tip information when being used by authorized clients. Unfortunately to be able to publish IPNS under your own private key, it has to be sent to the server. I have some ideas for a federated listing service though that could provide the required information to keep clients of participating servers up to date  
   
-There is a minimal proof of concept UI as well as some web server methods built around serving that ui. If IPNS delegation to the server is used, private key does not need to be sent to the server, but that makes the profile impossible to find except on the one server that knows it exists. If you give the server the private key it can install it into its own IPFS keystore and use it to publish IPNS properly for a given profile. It should be pretty safe to do this if it is running locally but if the server is remote you probably dont want to send it private keys unencrypted without https, and not at all if you don't control it. Also without https between a remote server and the client ui I can imagine some easy mitm attacks.  
+There is a minimal proof of concept UI as well as some web server methods built around serving that ui. This ui allows you to generate RSA private key in the browser and use it to sign messages from the server for it to publish on your behalf as i have not made any use of the js-ipfs library in the ui code as of yet. Currently we are relying on IPNS delegation to the server with its published lists and pubsub activity to resolve profileIds.   
   
-Otherwise, this ui allows you to generate RSA private key in the browser and use it to sign messages from the server for it to publish on your behalf as i have not made any use of the js-ipfs library in the ui code as of yet.
+Watch a demo on Youtube: https://www.youtube.com/watch?v=8DjmmvUvuxE
 
-Watch a demo on Youtube: https://www.youtube.com/watch?v=8DjmmvUvuxE  
+Play with it live: https://ipfstoy.chws.ca 
   
 ### State of the code  
   
 This is an experimental proof of concept written in a hurry. I welcome any and all improved reorganization and cleanup pull requests that make sense.  
   
 Some things that I know are issues:  
-  - test suite is not too comprehensive and some tests will fail if run in the wrong order right now i believe   
+  - test suite is not too comprehensive, and may need some local configuration related tweaks to pass all tests   
  - no limits on data field sizes or validation for their formatting, some should be imposed  
- - lots of junk commented out code all over  
- - related functions in stupid order in the files  
+ - lots of junk commented out code all over
+ - not using the native IPFS DAG/IPLD concept. I suspect the benefits to doing so may include needing less spidering and verifying code for cids as well as possible performance improvements.  
+ - code can be better organized. some functions are probably in structs which are less appropriate than ideal
  - everything is all in main package right now  
- - probably too coupled
+ - code is quite coupled making mocking for tests a challenge.
