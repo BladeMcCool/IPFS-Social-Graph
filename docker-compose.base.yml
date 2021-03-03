@@ -7,7 +7,7 @@ x-variables: &ciddag-variables
   CIDDAG_WL_PROFILEIDS: "${CIDDAG_WL_PROFILEIDS}"
   CIDDAG_IPNS_FEDERATIONMEMBERS: "${CIDDAG_IPNS_FEDERATIONMEMBERS}"
   CIDDAG_TLS_HOSTNAME: "${CIDDAG_TLS_HOSTNAME}"
-  CIDDAG_TLS_DATADIR: "/data/tlsdata"
+  CIDDAG_TLS_DATADIR: "/data/tls"
 
 services:
   ipfs0:
@@ -44,6 +44,7 @@ services:
       <<: *ciddag-variables
     volumes:
       - ./compose/ipfs0:/data/ipfs
+      - ./compose/tlsdata:/data/tls
     ports:
       - "4588:4588"
 
