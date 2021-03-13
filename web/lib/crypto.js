@@ -29,6 +29,69 @@ async function getSignature(privkeyb64, data) {
     return siggyB64
 }
 
+async function verifySignature(pubkeyb64, data) {
+    // privkeyArrayBuffer = base64StringToArrayBuffer(privkeyb64)
+    // console.log("got this many bytes of pk decoded array buffer:", privkeyArrayBuffer.byteLength)
+    // dataToSign = stringToArrayBuffer(data)
+    // console.log("got this many bytes of input, and after convert to arraybuffer for sig it is this long", data.length, dataToSign.byteLength)
+    // privkeyreused = await crypto.subtle.importKey("pkcs8", privkeyArrayBuffer, signAlgorithm, true, ["sign"])
+    // siggy = await window.crypto.subtle.sign(signAlgorithm, privkeyreused, dataToSign)
+    // console.log("siggy type,", typeof(siggy))
+    // console.log("siggy length ????", siggy.byteLength)
+    // siggyB64 = arrayBufferToBase64String(siggy)
+    // console.log("siggyb64 ????", siggyB64)
+    // return siggyB64
+    return false
+}
+
+async function verifyProfileSig(data, pubkey) {
+    console.log("verifyProfileSig to check data like", data)
+
+    let sigb64 =  data["Signature"]
+    data["Signature"] = null
+
+    let dataToVerify = stableJson(data, function(a, b){
+        return keyOrder["Profile"][a.key] > keyOrder["Profile"][b.key] ? 1 : -1;
+    })
+    data["Signature"] = sigb64
+    console.log("dataToVerify", dataToVerify)
+
+    let verified = false
+    let sigBytes = base64StringToArrayBuffer(sigb64)
+    try {
+        // console.log(sigBytes, dataToVerify)
+        verified = await crypto.subtle.verify(signAlgorithm, pubkey, sigBytes, stringToArrayBuffer(dataToVerify));
+    } catch(e) {
+        console.log("verifySig got verify err", e)
+    }
+    return verified
+}
+
+async function verifyGraphNodeSig(data, pubkey) {
+    console.log("verifyGraphNodeSig to check data like", data)
+    let sigb64 =  data["Signature"]
+    data["Signature"] = null
+
+    let dataToVerify = stableJson(data, function(a, b){
+        return keyOrder["GraphNode"][a.key] > keyOrder["GraphNode"][b.key] ? 1 : -1;
+    })
+    data["Signature"] = sigb64
+    console.log("verifyGraphNodeSig dataToVerify", dataToVerify)
+
+    let verified = false
+    let sigBytes = base64StringToArrayBuffer(sigb64)
+    try {
+        // console.log(sigBytes, dataToVerify)
+        verified = await crypto.subtle.verify(signAlgorithm, pubkey, sigBytes, stringToArrayBuffer(dataToVerify));
+    } catch(e) {
+        console.log("verifySig got verify err", e)
+    }
+    return verified
+
+}
+
+
+
 function stringToArrayBuffer(byteStr) {
     var bytes = new Uint8Array(byteStr.length)
     for (var i = 0; i < byteStr.length; i++) {
@@ -81,4 +144,28 @@ async function derivePubkeyFromPrivkey(privkeyB64) {
     // console.log(result)
     // console.log(pubExportedB64)
     return pubExportedB64
+}
+
+let importedKeys = {}
+function getPubkeyForProfileId(profileId) {
+    if (!importedKeys[profileId]) {
+        return null
+    }
+    return importedKeys[profileId]
+}
+async function importProfilePubkey(profileId, pubkeyB64) {
+    alreadyImported = getPubkeyForProfileId(profileId)
+    if (alreadyImported) {
+        return alreadyImported
+    }
+    try {
+        console.log("decode and import this:", pubkeyB64)
+        let arraybuf = base64StringToArrayBuffer(pubkeyB64)
+        pubkey = await crypto.subtle.importKey("spki", arraybuf, signAlgorithm, true, ["verify"])
+        importedKeys[profileId] = pubkey
+        return pubkey
+    } catch (e) {
+        console.log("importProfilePubkey got importKey error", e)
+        return null
+    }
 }

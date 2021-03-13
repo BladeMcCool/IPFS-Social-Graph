@@ -67,7 +67,7 @@ func (ic *IPFSCommunicator) addContentToIPFS(data []byte) string {
 }
 
 func (ic *IPFSCommunicator) publishIPNSUpdate(cid, keyName string) string {
-	log.Printf("publishIPNSUpdate: starting for profileId %s -> %s", keyName, cid)
+	log.Printf("publishIPNSUpdate: starting for keyName '%s' -> %s", keyName, cid)
 	start := time.Now()
 	//keyFileName := Crypter.keystorePath + keyName
 	//var expectName, _ = Crypter.getIPFSNameFromBinaryRsaKey(keyName)

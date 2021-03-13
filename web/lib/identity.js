@@ -10,6 +10,7 @@ async function setIdentity(keyname) {
     }
     console.log("setIdentity", keyname)
     selectedIdentity = keyname
+    setSelectedIdentityProfileId()
     selectBox = document.getElementById("chooseident")
     if (selectBox.value != keyname) {
         for (k = 0; k < selectBox.options.length; k++) {
@@ -22,7 +23,7 @@ async function setIdentity(keyname) {
     }
 
     //TODO restore the other identity fields here
-    displayTimelineTexts("[]")
+    displayTimelineTextsFromServer("[]")
     identity = identities[selectedIdentity]
 
     pubTextarea = document.getElementById("pubkeyb64")
@@ -69,15 +70,16 @@ async function setIdentity(keyname) {
     document.getElementById("inreplyto").value = ""
     focusPostText()
 
-    latestTimelineTextsJson = await getLatestTimelineTexts(identity["pub"], identity["profiletip"])
-    // console.log(latestTimelineTextsJson)
-    displayTimelineTexts(latestTimelineTextsJson)
     try {
         await localforage.setItem('selectedIdentity', keyname);
         console.log("updated selectedIdentity indexeddb");
     } catch (err) {
         console.log("failed to set selectedIdentity indexeddb ??", err);
     }
+
+    let latestTimelineTextsJson = await getLatestTimelineTexts(identity["pub"], identity["profiletip"])
+    // console.log(latestTimelineTextsJson)
+    displayTimelineTextsFromServer(latestTimelineTextsJson)
 }
 
 async function newIdentity() {
@@ -167,6 +169,7 @@ function scrapeSettingsIntoSelectedIdentity() {
 
 function unselectIdentity() {
     selectedIdentity = null
+    setSelectedIdentityProfileId()
     document.getElementById("dispname").value = ""
     document.getElementById("bio").value = ""
     document.getElementById("graphtip").value = ""
@@ -179,7 +182,7 @@ function unselectIdentity() {
     document.getElementById("followprofileid").value = ""
     document.getElementById("pubkeyb64").innerHTML = ""
     document.getElementById("privkeyb64").innerHTML = ""
-    displayTimelineTexts("[]")
+    displayTimelineTextsFromServer("[]")
     document.getElementById("currentprofile_detail").style.display = "none"
     document.getElementById("importprivkeyb64_container").style.display = "inline"
 }
@@ -194,6 +197,7 @@ async function renameSelectedIdentity() {
     identities[newidentname] = identities[selectedIdentity]
     delete identities[selectedIdentity]
     selectedIdentity = newidentname
+    setSelectedIdentityProfileId()
 
     removeSelectedIdentFromSelect(false)
     addIdentityToChoices(newidentname)
@@ -263,7 +267,7 @@ async function importKeyAsIdentity() {
 
 
 async function chooseIdentity(keyname) {
-    await cancelCurrentHistoryRequest()
+    // await cancelCurrentHistoryRequest()
     scrapeSettingsIntoSelectedIdentity()
     if (!keyname) {
         console.log("choose with no keyname , should wipe stuff")

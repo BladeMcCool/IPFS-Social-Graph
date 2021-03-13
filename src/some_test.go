@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"io/ioutil"
 	"log"
 	"net/http/httptest"
@@ -45,6 +44,7 @@ func init() {
 	log.Printf("Here1")
 	err = IPFS.makeKeyInIPFS("test_key")
 	if err != nil && err.Error() != "key/gen: key with name 'test_key' already exists" {
+		log.Println(err)
 		panic("failed to set up for tests")
 	}
 	log.Printf("Here2")
@@ -147,7 +147,8 @@ func Test_use_binary_rsa_key_from_ipfs(t *testing.T) {
 	msgHashSum := Crypter.makeMsgHashSum(msg)
 	signature := Crypter.makeSig(commonIpfsTestKey, msgHashSum)
 
-	pubkeyBytes := x509.MarshalPKCS1PublicKey(&commonIpfsTestKey.PublicKey)
+	pubkeyBytes, err := x509.MarshalPKIXPublicKey(&commonIpfsTestKey.PublicKey)
+	require.Nil(t, err)
 	_ = pubkeyBytes
 
 
@@ -394,9 +395,10 @@ func Test_make_profile(t *testing.T) {
 	keyReadback := commonIpfsTestKey
 
 	//we can get an ID for this key but taking the pubkey and hashing it.
-	pubKeyBytes := x509.MarshalPKCS1PublicKey(&keyReadback.PublicKey)
-	pubKeyHash := Crypter.makeMsgHashSum(pubKeyBytes)
-	_ = pubKeyHash
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&keyReadback.PublicKey)
+	require.Nil(t, err)
+	//pubKeyHash := Crypter.makeMsgHashSum(pubKeyBytes)
+	//_ = pubKeyHash
 
 	//in order to create the profile record it needs a social graph tip.
 
@@ -408,7 +410,8 @@ func Test_make_profile(t *testing.T) {
 	socialTip := GraphNode{
 		Version:   1,
 		Previous:  nil, //special case, this is the root node.
-		ProfileId: string(pubKeyHash),
+		//ProfileId: string(pubKeyHash),
+		ProfileId: Crypter.getPeerIDBase58FromPubkey(&keyReadback.PublicKey),
 		Post: &Post{
 			MimeType: "text/plain",
 			Cid: cid,
@@ -431,7 +434,7 @@ func Test_make_profile(t *testing.T) {
 
 	//whew now we have the essentials of a profile.
 	profile := Profile{
-		Id:      string(pubKeyHash),
+		Id:      socialTip.ProfileId,
 		Pubkey:  pubKeyBytes,
 		//IPNS:    IPNSName,
 		GraphTip: tipCid,
@@ -790,9 +793,11 @@ func Test_b64_pubkey_from_browser(t *testing.T) {
 	foo := pubkey.(*rsa.PublicKey)
 	_ = pubkey
 	_ = foo
+	pubkeyBytes, err := x509.MarshalPKIXPublicKey(foo)
+	require.Nil(t, err)
 	fakey := Profile{
 		Id:          Crypter.getPeerIDBase58FromPubkey(foo),
-		Pubkey:      x509.MarshalPKCS1PublicKey(foo),
+		Pubkey:      pubkeyBytes,
 		GraphTip:    "",
 		DisplayName: "Bob",
 		Bio:         "lol",
@@ -1083,7 +1088,7 @@ func wgTipLookerUpper(t *testing.T, wg *sync.WaitGroup, tlProfile *TLProfile) {
 }
 
 
-func TestDebugProfileIssue(t *testing.T) {
+func _TestDebugProfileIssue(t *testing.T) {
 	//initializers()
 	Federation.Init()
 	//profileId := "QmbweKMsBAjrQW83ipwR8yUtQGT3j1G1km1ajNDqPvBepo"
@@ -1108,4 +1113,24 @@ func TestDebugProfileIssue(t *testing.T) {
 		log.Print(line)
 	}
 	//_ = profile
+}
+
+func TestDebugBestTipIssue(t *testing.T) {
+	IPNSDelegateName, publishChannelName, err := IPFS.getIPNSDelegateName()
+	if err != nil {
+		panic(fmt.Sprintf("startup failure: %s", err.Error()))
+	}
+	Federation = IPNSDelegateFederation{
+		ipnsName: IPNSDelegateName,
+		publishChannelName: publishChannelName,
+		memberNames: getIPNSFederationMembernames(),
+		ipfs: IPFS,
+	}
+
+	Federation.Init()
+	profileTip := "QmY5LeBveGriTZEndpJA5ec5VQTBs7hxrPJGiWzNerehtf"
+	profileId := "QmNMLj7t8VzxmSs7K3NxuvJmGD3JjBcH48KujDk9n7GPbj"
+	Federation.PullUpdatesAndSelectBestTips()
+	res := Federation.Get(profileId)
+	assert.Equal(t, profileTip, *res)
 }

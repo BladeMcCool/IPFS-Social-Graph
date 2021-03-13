@@ -205,6 +205,7 @@ func (df *IPNSDelegateFederation) PullUpdatesAndSelectBestTips() {
 	start := time.Now()
 	profileIdsPossibleBestTips := map[string]map[string]bool{}
 	//wg := sync.WaitGroup{}
+	log.Printf("PullUpdatesAndSelectBestTips starting ..... ")
 
 	//TODO split this up
 
@@ -254,13 +255,15 @@ func (df *IPNSDelegateFederation) PullUpdatesAndSelectBestTips() {
 		//var longestHistoryTlProfile *TLProfile
 		longestHistory := 0
 		var bestProfileTipCid string
+		//if profileIdToTlProfileHistoryLen[profileId] == nil {
+		//	continue
+		//}
 		for possibleProfileTip, _ := range possibles {
-			if profileIdToTlProfileHistoryLen[profileId] == nil {
-				continue
-			}
+			log.Printf("PullUpdatesAndSelectBestTips dbg consider for %s ...%s (len: %d)", profileId, possibleProfileTip, profileIdToTlProfileHistoryLen[profileId][possibleProfileTip])
 			if profileIdToTlProfileHistoryLen[profileId][possibleProfileTip] > longestHistory {
 				longestHistory = profileIdToTlProfileHistoryLen[profileId][possibleProfileTip]
 				bestProfileTipCid = possibleProfileTip
+				log.Printf("PullUpdatesAndSelectBestTips dbg best tip so far for %s -> %s (len: %d)", profileId, bestProfileTipCid, longestHistory)
 			}
 		}
 		if bestProfileTipCid != "" {

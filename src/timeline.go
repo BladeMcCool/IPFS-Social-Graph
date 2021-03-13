@@ -223,8 +223,14 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 	log.Printf("fetchCheckProfile tip for profile: %s", profile.GraphTip)
 
 	//set pubkey
-	pubkey, err := x509.ParsePKCS1PublicKey(profile.Pubkey)
+	//pubkey, err := x509.ParsePKCS1PublicKey(profile.Pubkey)
+	pubkeyInterface, err := x509.ParsePKIXPublicKey(profile.Pubkey)
 	if err != nil {
+		return nil, err
+	}
+	pubkey, ok := pubkeyInterface.(*rsa.PublicKey)
+	if !ok {
+		panic("remove this after it doesnt happen.")
 		return nil, err
 	}
 
@@ -679,7 +685,7 @@ func (tl  *Timeline) generateTimeline() []*HistoryMessage {
 					//continue
 				}
 
-				followDate := JSONTime{} //by design i'm not timestamping things that are not posts. that may be a mistake
+				followDate := JSONTime{} //by (bad?) design i'm not timestamping things that are not posts. that may be a mistake
 				if e.GraphNode.Post != nil {
 					//if it comes along with a post though, we should be able to put a date on it.
 					followDate = e.GraphNode.Post.Date
@@ -869,7 +875,12 @@ func (tl *Timeline)  createSignedProfile(key *rsa.PrivateKey, displayName, bio, 
 //}
 
 func (tl *Timeline)  calculateProfileId(pubkey *rsa.PublicKey) ([]byte, string) {
-	pubKeyBytes := x509.MarshalPKCS1PublicKey(pubkey)
+	//pubKeyBytes := x509.MarshalPKCS1PublicKey(pubkey)
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(pubkey)
+	if err != nil {
+		log.Printf("calculateProfileId MarshalPKIXPublicKey err: %s", err.Error())
+		return nil, ""
+	}
 	//pubKeyHash := makeMsgHashSum(pubKeyBytes)
 	pubKeyHash := tl.crypter.getPeerIDBase58FromPubkey(pubkey)
 	return pubKeyBytes, pubKeyHash

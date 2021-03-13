@@ -8,8 +8,11 @@ require (
 	github.com/cheekybits/is v0.0.0-20150225183255-68e9c0620927
 	github.com/gogo/protobuf v1.3.2
 	github.com/gorilla/mux v1.8.0
+	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-ipfs-api v0.2.0
 	github.com/ipfs/go-ipfs-config v0.12.0
+	github.com/ipfs/go-ipfs-util v0.0.2
+	github.com/ipfs/go-ipld-cbor v0.0.5
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multibase v0.0.3

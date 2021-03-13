@@ -1,11 +1,18 @@
 <html>
 <head>
+<script src="./lib/ipfs.bundle.js"></script>
 <script src="./lib/localforage.min.js"></script>
+<script src="./lib/peerutil.bundle.js"></script>
+<script src="./lib/uint8ArrayConcat.js"></script>
+<script src="./lib/stablejson.bundle.js"></script>
+<script src="./lib/binary-insert.js"></script>
+<script src="./lib/pool.js"></script>
 <script src="./lib/ui.js"></script>
 <script src="./lib/server.js"></script>
 <script src="./lib/crypto.js"></script>
 <script src="./lib/identity.js"></script>
-<script src="./lib/peerutil.bundle.js"></script>
+<script src="./lib/ipfs.js"></script>
+<script src="./lib/timeline.js"></script>
 <style></style>
 </head>
 <body>
@@ -13,6 +20,12 @@
   <table>
     <tr>
       <td valign="top" id="form">
+        <p>
+          <button onclick="experiment1()">Js History</button>
+          <button onclick="loadServerHistory()">From-server History</button>
+        </p>
+        <hr>
+
         <p>Display name:&nbsp;<input type="text" id="dispname" name="dispname"></p>
         <p>Bio:&nbsp;<input type="text" id="bio" name="bio"></p>
         <p>Post text:&nbsp;<input type="text" id="posttext" name="posttext"></p>

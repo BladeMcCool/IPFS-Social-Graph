@@ -23,8 +23,8 @@ type GraphNode struct {
 	//// OOOOR maybe the profileid should be the ipns name ?? that is also a effectively a hash of the pubkey, and why not just use it then it is a universal key which could resolve via ipns or other means.
 	Post *Post `json:"post,omitempty"`
 
-	RetractionOfNodeCid *string `json: "retraction,omitempty"`
-	RepostOfNodeCid *string `json: "repost,omitempty"`
+	RetractionOfNodeCid *string `json:"retraction,omitempty"`
+	RepostOfNodeCid *string `json:"repost,omitempty"`
 
 	PublicFollow []string `json:"publicfollow,omitempty"`
 	PublicUnfollow []string `json:"publicufollow,omitempty"`
@@ -91,9 +91,8 @@ type Post struct {
 }
 
 type Profile struct {
-	//Id []byte //a sha256 hash of the output of x509.MarshalPKCS1PublicKey(&keyReadback.PublicKey), see Test_use_binary_rsa_key_from_ipfs
 	Id string //a sha256 hash of the output of marshalled ipfs pubkey protobuf, converted to base58, aka the IPNS name
-	Pubkey []byte //output of x509.MarshalPKCS1PublicKey(&keyReadback.PublicKey), so ppl should be able to use this to verify signatures as well as encrypt private messages
+	Pubkey []byte //output of x509.MarshalPKIXPublicKey(&keyReadback.PublicKey), so ppl should be able to use this to verify signatures as well as encrypt private messages
 	//IPNS string // ipns address where this profile could be found UPDATE now I know this can be derived from the pubkey, and how to do so, it does not need to be stored as well.
 	GraphTip string // cid of the tip GraphNode of this profiles publicly available social graph. Clients would start here and spider back through previous nodes.
 	//Socials map[string]string // suggested keys would be things like twitter, facebook, minds, etc. with links to the profiles

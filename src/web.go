@@ -20,6 +20,7 @@ import (
 	//"log"
 	"net/http"
 )
+
 type APIService struct {
 	TimeService         TimeService
 	WlProfileIds        map[string]bool
@@ -29,8 +30,9 @@ type APIService struct {
 	ListenPort          string
 	BaseWlProfileIdList []string
 	TLSHostName         string
-	TLSDataDir string
+	TLSDataDir          string
 }
+
 //var WlProfileIds = map[string]bool{}
 //var WlProfileIdMutex = sync.RWMutex{}
 func (s *APIService) Start() {
@@ -51,20 +53,20 @@ func (s *APIService) getHttpHandler() http.Handler {
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, // All origins
-		AllowedMethods: []string{"GET","POST"},
+		AllowedMethods: []string{"GET", "POST"},
 	})
 
 	router := mux.NewRouter()
 
 	filePath := "./web"
-	if (s.FilePathOverride != "") {
+	if s.FilePathOverride != "" {
 		filePath = s.FilePathOverride
 	}
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, filePath + "/index.html")
+		http.ServeFile(w, r, filePath+"/index.html")
 	})
-	router.PathPrefix("/lib").Handler(http.StripPrefix("/lib", http.FileServer(http.Dir(filePath + "/lib"))))
+	router.PathPrefix("/lib").Handler(http.StripPrefix("/lib", http.FileServer(http.Dir(filePath+"/lib"))))
 
 	authedRouter := router.PathPrefix("/service").Subrouter()
 	// some middleware to auth by pubkey
@@ -72,9 +74,11 @@ func (s *APIService) getHttpHandler() http.Handler {
 	authedRouter.HandleFunc("/unsignedGraphNodeForPost", s.unsignedGraphNodeForPost).Methods("POST")
 	authedRouter.HandleFunc("/unsignedProfileWithFirstPost", s.unsignedProfileWithFirstPost).Methods("POST")
 	authedRouter.HandleFunc("/publishedProfileCid", s.publishedProfileCid).Methods("POST")
-	authedRouter.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET","POST")
+	authedRouter.HandleFunc("/updateProfileCid", s.updateProfileCid).Methods("POST")
+	authedRouter.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET", "POST")
 	authedRouter.HandleFunc("/history", s.history).Methods("POST")
 	authedRouter.HandleFunc("/profileBestTip", s.profileBestTip).Methods("POST")
+	authedRouter.HandleFunc("/profileBestTipCid", s.profileBestTipCid).Methods("POST")
 	return c.Handler(router)
 }
 
@@ -124,7 +128,7 @@ func (s *APIService) StartTLSServer() {
 	log.Println("addTLSServer: about to add regular http handler such that it handles autocert stuff and redirects everything else to https")
 
 	regSrv := &http.Server{
-		Addr: ":80",
+		Addr:         ":80",
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -136,6 +140,7 @@ func (s *APIService) StartTLSServer() {
 	}
 
 }
+
 //func makeServerFromMux(mux *http.ServeMux) *http.Server {
 //	// set timeouts so that a slow or malicious client doesn't
 //	// hold resources forever
@@ -156,7 +161,6 @@ func forceHttps() *http.ServeMux {
 	mux.HandleFunc("/", handleRedirect)
 	return mux
 }
-
 
 func (s *APIService) setupWl() {
 	for _, profileId := range s.BaseWlProfileIdList {
@@ -189,8 +193,8 @@ func (s *APIService) setupExtendedWl() {
 }
 func (s *APIService) getHistoryFollows(profileId string) []string {
 	tl := &Timeline{
-		crypter: Crypter,
-		ipfs: IPFS,
+		crypter:   Crypter,
+		ipfs:      IPFS,
 		profileId: profileId,
 	}
 	err := tl.LoadProfile()
@@ -208,13 +212,12 @@ func (s *APIService) getHistoryFollows(profileId string) []string {
 
 func (s *APIService) WlProfileIdViaPubkeyHeaderAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%#v", r.URL)
-		if r.URL != nil {
-			if r.URL.Path == "/" || r.URL.Path == "/peerId" {
-				//custom cheesy hax to avoid doing subrouter stuff to allow one path to be excluded from this auth.
-				next.ServeHTTP(w, r)
-				return
-			}
+		//log.Printf("WlProfileIdViaPubkeyHeaderAuthMiddleware r.Url like %#v", r.URL)
+		if r.TLS == nil {
+			// if not doing https, its because its running locally and therefore locking the server down isnt much of a concern.
+			log.Printf("WlProfileIdViaPubkeyHeaderAuthMiddleware not https -- allowing request")
+			next.ServeHTTP(w, r)
+			return
 		}
 
 		profileId, onWl := s.checkHeaderForPubkeyOnWl(r.Header.Get("X-Pubkey-B64"))
@@ -228,7 +231,7 @@ func (s *APIService) WlProfileIdViaPubkeyHeaderAuthMiddleware(next http.Handler)
 		next.ServeHTTP(w, r)
 	})
 }
-func (s *APIService) checkHeaderForPubkeyOnWl(pubkeyB64 string) (string, bool){
+func (s *APIService) checkHeaderForPubkeyOnWl(pubkeyB64 string) (string, bool) {
 	if pubkeyB64 == "" {
 		return "", false
 	}
@@ -246,19 +249,19 @@ func (s *APIService) checkHeaderForPubkeyOnWl(pubkeyB64 string) (string, bool){
 	return profileId, true
 }
 
-
 type CreateProfileJsonArgs struct {
-	Pubkey string `json: "pubkey"`
-	Text *string `json: "text,omitempty"`
-	Previous *string `json: "previous,omitempty"`
-	InReplyTo *string `json: "inreplyto,omitempty"`
-	FollowProfileId *string `json: "followprofileid,omitempty"`
-	UnfollowProfileId *string `json: "unfollowprofileid,omitempty"`
-	LikeOfNodeCid *string `json: "likeofnodecid,omitempty"`
-	UnlikeOfNodeCid *string `json: "unlikeofnodecid,omitempty"`
+	Pubkey              string  `json: "pubkey"`
+	Text                *string `json: "text,omitempty"`
+	Previous            *string `json: "previous,omitempty"`
+	InReplyTo           *string `json: "inreplyto,omitempty"`
+	FollowProfileId     *string `json: "followprofileid,omitempty"`
+	UnfollowProfileId   *string `json: "unfollowprofileid,omitempty"`
+	LikeOfNodeCid       *string `json: "likeofnodecid,omitempty"`
+	UnlikeOfNodeCid     *string `json: "unlikeofnodecid,omitempty"`
 	RetractionOfNodeCid *string `json: "retractionofnodecid,omitempty"`
-	RepostOfNodeCid *string `json: "repostofnodecid,omitempty"`
+	RepostOfNodeCid     *string `json: "repostofnodecid,omitempty"`
 }
+
 func (s *APIService) unsignedGraphNodeForPost(w http.ResponseWriter, r *http.Request) {
 	//bodyall, err := ioutil.ReadAll(r.Body)
 	//log.Printf("entire contents of post body: '%s'", bodyall)
@@ -282,7 +285,7 @@ func (s *APIService) unsignedGraphNodeForPost(w http.ResponseWriter, r *http.Req
 		return
 	}
 	graphNode := &GraphNode{
-		Version: 1,
+		Version:   1,
 		ProfileId: Crypter.getPeerIDBase58FromPubkey(pubkey),
 		//Post: firstPost,
 		Previous: args.Previous,
@@ -324,7 +327,7 @@ func (s *APIService) unsignedGraphNodeForPost(w http.ResponseWriter, r *http.Req
 	//fmt.Fprintf(w, "Category: %v\n", vars["category"])
 }
 
-func getRSAPubkeyFromB64(b64 string) (*rsa.PublicKey, error){
+func getRSAPubkeyFromB64(b64 string) (*rsa.PublicKey, error) {
 	decoded, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
 		log.Println("decode error:", err)
@@ -337,7 +340,7 @@ func getRSAPubkeyFromB64(b64 string) (*rsa.PublicKey, error){
 	pubkey := pubkeyInterface.(*rsa.PublicKey)
 	return pubkey, nil
 }
-func getRSAPrivatekeyFromB64(b64 string) (*rsa.PrivateKey, error){
+func getRSAPrivatekeyFromB64(b64 string) (*rsa.PrivateKey, error) {
 	decoded, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
 		log.Println("decode error:", err)
@@ -352,14 +355,15 @@ func getRSAPrivatekeyFromB64(b64 string) (*rsa.PrivateKey, error){
 }
 
 type CreateProfileStep2JsonArgs struct {
-	Pubkey string `json: "pubkey"`
-	UnsignedGraphNodeJson string `json: "unsignedGraphNodeJson"`
-	Signatureb64 string `json: "signatureb64"`
-	DisplayName string  `json: "displayname"`
-	Bio string  `json: "bio"`
-	Previous *string  `json: "previous,omitempty"`
-	UseIPNSDelegate  bool  `json: "useipnsdelegate,omitempty"`
+	Pubkey                string  `json: "pubkey"`
+	UnsignedGraphNodeJson string  `json: "unsignedGraphNodeJson"`
+	Signatureb64          string  `json: "signatureb64"`
+	DisplayName           string  `json: "displayname"`
+	Bio                   string  `json: "bio"`
+	Previous              *string `json: "previous,omitempty"`
+	UseIPNSDelegate       bool    `json: "useipnsdelegate,omitempty"`
 }
+
 func (s *APIService) unsignedProfileWithFirstPost(w http.ResponseWriter, r *http.Request) {
 	var err error
 
@@ -406,7 +410,7 @@ func (s *APIService) unsignedProfileWithFirstPost(w http.ResponseWriter, r *http
 
 	fakeTl := &Timeline{ //just for util funcs ... maybe they dont belong where they are
 		crypter: Crypter,
-		ipfs: IPFS,
+		ipfs:    IPFS,
 	}
 	validSig := fakeTl.checkGraphNodeSignature(graphNode, pubkey)
 	if validSig != true {
@@ -466,11 +470,12 @@ func (s *APIService) unsignedProfileWithFirstPost(w http.ResponseWriter, r *http
 }
 
 type CreateProfileStep3JsonArgs struct {
-	Pubkey string `json: "pubkey"`
-	Privkey string `json: "privkey,omitempty"`
+	Pubkey              string `json: "pubkey"`
+	Privkey             string `json: "privkey,omitempty"`
 	UnsignedProfileJson string `json: "unsignedProfileJson"`
-	Signatureb64 string `json: "signatureb64"`
+	Signatureb64        string `json: "signatureb64"`
 }
+
 func (s *APIService) publishedProfileCid(w http.ResponseWriter, r *http.Request) {
 	var err error
 	log.Printf("method 3 start")
@@ -511,7 +516,7 @@ func (s *APIService) publishedProfileCid(w http.ResponseWriter, r *http.Request)
 
 	fakeTl := &Timeline{ //just for util funcs ... maybe they dont belong where they are
 		crypter: Crypter,
-		ipfs: IPFS,
+		ipfs:    IPFS,
 	}
 	validSig, err := fakeTl.checkProfileSignature(profile, pubkey)
 	//tODO why does the other checkNNNSig only return a bool and not a error too? also that check below is gross.
@@ -541,13 +546,11 @@ func (s *APIService) publishedProfileCid(w http.ResponseWriter, r *http.Request)
 		//fakeTl.ipfs.addPrivKeyIPNSPublish(privkey, profile.Id, profileCid)
 	}
 
-
 	//if err != nil {
 	//	log.Println("publish graphnode to ipfs err:", err)
 	//	w.WriteHeader(http.StatusInternalServerError)
 	//	return
 	//}
-
 
 	log.Printf("method 3 finish well")
 	log.Printf("so ... now profile is published to %s... no ipns for it tho.", profileCid)
@@ -556,6 +559,75 @@ func (s *APIService) publishedProfileCid(w http.ResponseWriter, r *http.Request)
 	w.Write([]byte(profileCid))
 	//fmt.Fprintf(w, "Category: %v\n", vars["category"])
 }
+
+type UpdateProfileCidJsonArgs struct {
+	ProfileJson string
+	ProfileTip string
+}
+func (s *APIService) updateProfileCid(w http.ResponseWriter, r *http.Request) {
+
+
+	var err error
+	log.Printf("updateProfileCid 3 start")
+	args := &UpdateProfileCidJsonArgs{}
+	err = json.NewDecoder(r.Body).Decode(&args)
+	_ = err
+	if err != nil {
+		log.Println("decode error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	log.Printf("%#v", args)
+
+	profile := &Profile{}
+	err = json.Unmarshal([]byte(args.ProfileJson), profile)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	pubkeyInterface, err := x509.ParsePKIXPublicKey(profile.Pubkey)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	pubkey, ok := pubkeyInterface.(*rsa.PublicKey)
+	if !ok {
+		log.Println("Problem asserting pubkey to *rsa.PublicKey")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fakeTl := &Timeline{
+		crypter: Crypter,
+		ipfs:    IPFS,
+	}
+	validSig, err := fakeTl.checkProfileSignature(profile, pubkey)
+	if err != nil || !validSig {
+		log.Printf("invalid signature :(")
+		log.Print(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	//// MAJOR TODO: accept a signature arg which should be a sig for the args.ProfileTip+our delegate name, and only accept the update if that is valid.
+
+	//dont really need to be doing this but ... why not ... we arent publishing the post content or graphnode stuff but why not this ... also i want to see that i get the same cid from both publishes here and in the client.
+	profileCidFromOurPublish := fakeTl.publishProfileToIPFS(profile) //TODO this should also return an err like the other publish
+
+	//cache the cid we were told by the client tho
+	fakeTl.ipfs.updateCacheEntry(profile, args.ProfileTip)
+	if profile.IPNSDelegate != nil {
+		//fakeTl.publishDelegatedIPNSUpdate(profile, profileCid)
+		fakeTl.ipfs.updateDelegateEntry(profile, args.ProfileTip)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(profileCidFromOurPublish))
+}
+
 func (s *APIService) IPNSDelegateName(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, ipfsName, err := IPFS.getIPNSDelegateName()
@@ -587,9 +659,10 @@ func (s *APIService) peerId(w http.ResponseWriter, r *http.Request) {
 }
 
 type GetHistoryArgs struct {
-	Pubkey string `json: "pubkey"`
+	Pubkey     string `json: "pubkey"`
 	ProfileTip string `json:"profiletip"`
 }
+
 func (s *APIService) history(w http.ResponseWriter, r *http.Request) {
 	args := &GetHistoryArgs{}
 	err := json.NewDecoder(r.Body).Decode(&args)
@@ -635,6 +708,31 @@ func (s *APIService) history(w http.ResponseWriter, r *http.Request) {
 type ProfileBestTipJsonArgs struct {
 	ProfileId string `json: "profileId"`
 }
+
+func (s *APIService) profileBestTipCid(w http.ResponseWriter, r *http.Request) {
+	args := &ProfileBestTipJsonArgs{}
+	err := json.NewDecoder(r.Body).Decode(&args)
+	if err != nil {
+		log.Println("decode error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// check cache before federation
+	profileCidPtr, _ := IPFS.determineProfileCid(args.ProfileId)
+	if profileCidPtr == nil {
+		profileCidPtr = Federation.Get(args.ProfileId)
+	}
+	if profileCidPtr == nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(*profileCidPtr))
+}
+
+
 func (s *APIService) profileBestTip(w http.ResponseWriter, r *http.Request) {
 	args := &ProfileBestTipJsonArgs{}
 	err := json.NewDecoder(r.Body).Decode(&args)
@@ -669,7 +767,7 @@ func (s *APIService) profileBestTip(w http.ResponseWriter, r *http.Request) {
 	}
 	type bestTipResponse struct {
 		ProfileData Profile
-		ProfileCid string
+		ProfileCid  string
 	}
 	outBytes, err := json.Marshal(&bestTipResponse{*profile, *profileCidPtr})
 	if err != nil {
