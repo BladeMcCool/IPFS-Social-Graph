@@ -1,8 +1,9 @@
 let asyncPool
 let multihistory = {}
+
 // const binaryInsert = require('binary-insert').binaryInsert
 
-async function experiment1() {
+async function loadJsTimeline() {
     asyncPool = require("tiny-async-pool")
     if (!ipfsStarted) {
         await startIpfs()
@@ -13,16 +14,18 @@ async function experiment1() {
         alert("no identity selected")
         return
     }
-    alert("identity is " + selectedIdentity)
+    await cancelCurrentHistoryRequest() //in case there is a server one going, kill it.
+    resetTextTimelineArea()
+    // alert("identity is " + selectedIdentity)
     let profileData
     try {
         profileData = await fetchCheckProfile(identity["profileid"], identity["profiletip"], identity["pub"])
+        // identities[selectedIdentity].profileData = profileData
         console.log("profileData", profileData, "identity", identity)
     } catch(e) {
         console.log("load history got error from fetchCheckProfile:", e)
+        return
     }
-    resetTextTimelineArea()
-    await cancelCurrentHistoryRequest() //in case there is a server one going, kill it.
     await fetchGraphNodeHistory(profileData, true, multihistory)
     // let followees = extractFollowsProfileCids(history)
 
@@ -35,6 +38,30 @@ async function experiment1() {
     // console.log("followees", followees)
 
     // displayTimelineTexts(history)
+}
+
+async function updateJsTimeline() {
+    //i want to find updates only.
+    //so ... for every profileid i follow and my own one, go spider that like a normal timeline load, except stop when we hit data we already know.
+    await cancelCurrentHistoryRequest() //in case there is a server one going, kill it.
+    let profileData
+    try {
+        profileData = await fetchCheckProfile(identity["profileid"], identity["profiletip"], identity["pub"])
+        // identities[selectedIdentity].profileData = profileData
+        console.log("updateJsTimeline got profileData", profileData, "identity", identity)
+    } catch(e) {
+        console.log("updateJsTimeline got error from fetchCheckProfile:", e)
+        return
+    }
+    //we can spider with normal method to find anything new we made and new followee history etc resulting from those actions by our profile.
+    fetchGraphNodeHistory(profileData, true, multihistory, true).catch(e => console.log(`updateJsTimeline fetchGraphNodeHistory err while collecting for ${profileData.Id}: `, e))
+
+    //but we arent going to end up going and redoing our followees under normal circumstances. so lets do those
+    for (let followeeProfileId in followeeProfiles) {
+        getFolloweeProfileInfo(followeeProfileId).then(followeeProfileInfo => {
+            fetchGraphNodeHistory(followeeProfileInfo, false, multihistory, true).catch(e => console.log(`updateJsTimeline fetchGraphNodeHistory err while collecting for followee ${profileData.Id}: `, e))
+        }).catch(e => console.log(`updateJsTimeline getFolloweeProfileInfo err while collecting for ${profileData.Id}: `, e))
+    }
 }
 
 async function experiment2() {
@@ -186,8 +213,17 @@ function extractFollowsProfileCids(graphnodeHistory) {
 }
 
 async function fetchCheckProfile(profileId, profileCid, pubkeyb64) {
-    if (profileCid == null) {
-        profileCid = await profileBestTipCid(profileId) // TODO resolve on our own w/o server stuff
+    // if (!profileCid) {
+    //     profileCid = profileTipCache[profileId]
+    // }
+    if (!profileCid) {
+        try {
+            console.log(`fetchCheckProfile WELP idk about profile id ${profileId} so we're asking the server for profileBestTipCid...`)
+            profileCid = await profileBestTipCid(profileId) // TODO resolve on our own w/o server stuff
+            // profileTipCache[profileId] = profileCid
+        } catch(e) {
+            throw e
+        }
         console.log("fetchCheckProfile: determined profileCid to be ", profileCid)
     } else {
         console.log("fetchCheckProfile:explicitly requesting profileCid ", profileCid)
@@ -361,7 +397,7 @@ async function fillHistoryRepostInfo(entries) {
     //otherwise code similar to above
 }
 
-async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistory) {
+async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistory, stopAtKnown) {
     // let headGnJson = await getCidContentsByCat(profile["GraphTip"])
     console.log("fetchGraphNodeHistory to collect profile id", profile.Id)
     // headGn = JSON.parse(headGnJson)
@@ -371,6 +407,9 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
     let history = []
     // let multihistory = {}
     multihistory[profile.Id] = history
+    if (!gnOfInterestByProfileId[profile.Id]) {
+        gnOfInterestByProfileId[profile.Id] = {}
+    }
 
     let headGn = {"previous":profile["GraphTip"]}
     // let lastProcessedGn = null
@@ -378,24 +417,30 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
     while (headGn["previous"] != null) {
 
         console.log("here3 about to getCidContentsByCat", headGn)
+        let currentGnCid = headGn["previous"]
+        if (stopAtKnown && gnOfInterestByProfileId[profile.Id][currentGnCid]) {
+            console.log(`fetchGraphNodeHistory: stopping additional collection of data from profileId ${profile.Id} due to encountering known cid ${currentGnCid} in the history -- collected all new info for this profile.`)
+            break
+        }
+
         try {
-            let currentGnJson = await getCidContentsByCat(headGn["previous"], true)
+            let currentGnJson = await getCidContentsByCat(currentGnCid, true)
             console.log("here4", currentGnJson)
             currentGn = JSON.parse(currentGnJson)
             console.log("here5 currentGnJson", currentGnJson)
         } catch(e) {
-            console.log(`fetchGraphNodeHistory: error fetching ${headGn["previous"]}`)
+            console.log(`fetchGraphNodeHistory: error fetching ${currentGnCid}:`, e)
             break
         }
 
         let gnSigVerified = await verifyGraphNodeSig(currentGn, getPubkeyForProfileId(profile["Id"]))
         if (!gnSigVerified) {
-            console.log(`encounterd invalid sig in profile id ${profile["Id"]} at cid ${headGn["previous"]}`)
+            console.log(`encountered invalid sig in profile id ${profile["Id"]} at cid ${currentGnCid}`)
             // throw new Error("fetchGraphNodeHistory: invalid sig")
             break; //done adding stuff since we just hit invalid things.
         }
         currentGn.profile = profile
-        currentGn.Cid = headGn["previous"]
+        currentGn.Cid = currentGnCid
         if (currentGn.Cid == null) {
             //get rid of this if the weird issue if missing cid doesnt happen again, likely was being caused by a scoping issue
             alert("wot") //i think this was a variable scoping issue. havent seen it since fixing those scopes
@@ -411,6 +456,12 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
         // currentGn.DisplayName = "nyi"
         // currentGn.Date = "0001-01-01T00:00:00Z" //maybe everything should have one tho.
         history.push(currentGn)
+        gnOfInterestByProfileId[currentGn.ProfileId][currentGn.Cid] = currentGn
+        // let isKnownCid = knownCidsByProfile[profile["Id"]][currentGn.Cid] ? true : false
+        // if (profileTipCache[profile["Id"]] && !isKnownCid) {
+        //     console.log(`fetchGraphNodeHistory saw presumanbly new, unknown gn cid ${currentGn.Cid} in history of profile ${profile.Id}`)
+        // }
+        // profileTipCache[profile["Id"]] = currentGn.Cid
 
         // gnReplyParents[currentGn.Cid] = currentGn
 
@@ -475,11 +526,12 @@ async function getFolloweeProfileInfo(profileId) {
     let followeeProfile = {}
     try {
         followeeProfile = await fetchCheckProfile(profileId)
+        followeeProfiles[profileId] = followeeProfile
         console.log("getFillFolloweeHistory followeeProfile", followeeProfile)
     } catch(e) {
         console.log("getFillFolloweeHistory got error from fetchCheckProfile:", e)
     }
-    followeeProfileInfo[profileId] = followeeProfile
+    // followeeProfileInfo[profileId] = followeeProfile
     return followeeProfile
 }
 

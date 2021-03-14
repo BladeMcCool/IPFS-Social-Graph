@@ -24,7 +24,7 @@ async function getCidContentsByCat(cid, bubbleError) {
     let chunknum = 0
     const chunks = []
     let catopts = {
-        timeout: 5000
+        timeout: 45000
     }
     try {
         for await (const chunk of ipfs.cat(cid, catopts)) {

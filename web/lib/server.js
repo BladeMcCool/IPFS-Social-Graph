@@ -131,26 +131,28 @@ async function getLatestTimelineTexts(pubkeyb64, profiletip) {
 
 async function profileBestTip(profileId) {
     console.log("profileBestTip...")
+    // console.trace()
     if (!profileId) {
         console.log("profileBestTip: no data - do nothing")
         return ""
     }
-    payload = {"profileId":profileId}
+    let payload = {"profileId":profileId}
     console.log("send payload to get profileBestTip like", payload)
-    result = await makeRequest("POST", serviceBaseUrl + "/service/profileBestTip", payload, true)
+    let result = await makeRequest("POST", serviceBaseUrl + "/service/profileBestTip", payload, true)
     // console.log("got history result like:", result)
     return JSON.parse(result)
 }
 async function profileBestTipCid(profileId) {
-    console.log("profileBestTipCid...")
+    console.log("profileBestTipCid... ")
+    // console.trace() //<-- was concerned something weird was going on but it seems its all due to the racy nature of the multiple data collection async runners.
     if (!profileId) {
         console.log("profileBestTipCid: no data - do nothing")
         return ""
     }
-    payload = {"profileId":profileId}
+    let payload = {"profileId":profileId}
     console.log("send payload to get profileBestTipCid like", payload)
-    result = await makeRequest("POST", serviceBaseUrl + "/service/profileBestTipCid", payload, true)
-    // console.log("got history result like:", result)
+    let result = await makeRequest("POST", serviceBaseUrl + "/service/profileBestTipCid", payload, true)
+    console.log(`profileBestTipCid for ${profileId} from server: ${result}`)
     return result
 }
 

@@ -2,6 +2,33 @@ var identities
 var selectedIdentity
 var importPubkey
 let selectedIdentityProfileId
+let timelineUpdaterInterval
+
+let orderedTimelineElements = []
+let retractedCids = {} //map cid to person who retracted it. just need to only retract things that are done by their owners.
+let gnReplyParents = {}
+let repostedCids = {}
+let followeeProfiles = {}
+let follows = {}
+let unfollows = {}
+let followButtons = {}
+let noTsGnodes = {}
+let profileTipCache = {}
+let gnOfInterestByProfileId = {}
+
+function resetTextTimelineArea() {
+    let target = document.getElementById("timeline")
+    target.textContent = "" //apparently not the worst way to make all the existing child elements go away before we render the updated history.
+    orderedTimelineElements = []
+    gnReplyParents = {}
+    repostedCids = {}
+    follows = {}
+    unfollows = {}
+    noTsGnodes = {}
+    profileTipCache = {}
+    gnOfInterestByProfileId = {}
+    followeeProfiles = {}
+}
 
 function setSelectedIdentityProfileId() {
     if (selectedIdentity) {
@@ -207,9 +234,11 @@ async function createProfilePost() {
     clearReply()
     clearFollow()
 
-    latestTimelineTextsJson = await getLatestTimelineTexts(pubkeyb64, updatedProfileCid)
+    // latestTimelineTextsJson = await getLatestTimelineTexts(pubkeyb64, updatedProfileCid)
     // console.log(latestTimelineTextsJson)
-    displayTimelineTextsFromServer(latestTimelineTextsJson)
+    // displayTimelineTextsFromServer(latestTimelineTextsJson)
+    // await loadJsTimeline()
+    await updateJsTimeline()
 }
 
 async function loadServerHistory() {
@@ -242,17 +271,11 @@ function hideFollowButtonsForProfileId(followProfileId) {
     }
 }
 
-let orderedTimelineElements = []
-let retractedCids = {} //map cid to person who retracted it. just need to only retract things that are done by their owners.
-let gnReplyParents = {}
-let repostedCids = {}
-let follows = {}
-let unfollows = {}
-let followButtons = {}
+
 function addGnToTimeline(gnode) {
     // let checkEntry = entry
 
-    let foundTs = gnode.Date ? gnode.Date : (gnode.post ? gnode.post.Date : undefined )
+    let foundTs = gnode.Date ? gnode.Date : (gnode.post ? gnode.post.Date : undefined)
     // let addSec = 0
     // while (!foundTs) {
     //     checkEntry = checkEntry.prev
@@ -261,11 +284,13 @@ function addGnToTimeline(gnode) {
     //     addSec++
     // }
     if (!foundTs) {
+        addNoTsGnode(gnode)
         foundTs = "0001-01-01T00:00:00Z"
+    } else {
+        fixMissingTsItemsRelatedTo(gnode.ProfileId, foundTs)
     }
     console.log(`addGnToTimeline, using ts ${foundTs}`, gnode)
-    let tsDate = new Date(foundTs)
-    gnode.jsDate = new Date(tsDate.getTime());
+    gnode.jsDate = new Date(foundTs) //new Date(tsDate.getTime() + sec); //<-- example of how to add time to a date.
 
     prepareDomElements(gnode)
 
@@ -292,8 +317,10 @@ function addGnToTimeline(gnode) {
 
     }
 
-    // //perhaps do not add things that are not replyable main timeline entries ...
-    // this isnt right tho. we want to see
+    performDomInsertion(gnode)
+}
+
+function performDomInsertion(gnode) {
     let includeInMainTl = false
     if (gnode.post && (!gnode.post.Reply || gnode.post.Reply.length == 0)) {
         includeInMainTl = true
@@ -304,11 +331,6 @@ function addGnToTimeline(gnode) {
     if (gnode.ProfileId == selectedIdentityProfileId && gnode.publicfollow && gnode.publicfollow.length > 0) {
         includeInMainTl = true
     }
-
-    // if (checkIfRetracted(gnode)) {
-    //     // return <-- if we return early we wont put the retracted thing in the dom at all. but that can completely hide a chain of replies from being visible, which I dont like, so I'm leaning towards just forcing the previewtext to remain redacted when it loads in.
-    //     gnode.retracted = true
-    // }
 
     if (includeInMainTl) {
         let mainTlcompare = (a, b) => {
@@ -348,6 +370,42 @@ function addGnToTimeline(gnode) {
     }
 }
 
+function addNoTsGnode(gnode) {
+    if (!noTsGnodes[gnode.ProfileId]) {
+        noTsGnodes[gnode.ProfileId] = []
+    }
+    noTsGnodes[gnode.ProfileId].push(gnode)
+}
+function fixMissingTsItemsRelatedTo(profileId, foundTs) {
+    if (!noTsGnodes[profileId]) { return }
+    let jsDate = new Date(foundTs)
+    let timelineEl = document.getElementById("timeline")
+    for (let i = 0; i < noTsGnodes[profileId].length; i++) {
+        let gnode = noTsGnodes[profileId][i]
+
+        //we need to:
+        try {
+            //  remove it from the dom
+            timelineEl.removeChild(gnode.domElements.container)
+            //  remove it from the ordered array
+            orderedTimelineElements.splice(orderedTimelineElements.indexOf(gnode), 1)
+        } catch(e) {
+            console.log(`fixMissingTsItemsRelatedTo error like ${e.message}`)
+        }
+        //  fix the ts (set .jsDate and .Date)
+        gnode.Date = foundTs
+        gnode.jsDate = jsDate
+        //  jam it back in
+        //  now, i would LIKE to update the text that is displayed in the date lines for the rows we just jammed back in but we dont have a reference for just that bit.
+        //  would like to be able to write the below, but not everything is putting the tsTextnode yet ... wait a gnode should only need taht done once for it. and dont need to be done how it is.
+        gnode.domElements.tsTextnode.textContent = cheesyDate(gnode.jsDate) + " "
+        // and to keep a reference i'd have to rework a few things like all the spots where i currently just stick it into the text
+        performDomInsertion(gnode)
+    }
+    // remove the stuff for this profile id from the noTsGnodes list since they all should have something now.
+    delete noTsGnodes[profileId]
+}
+
 // function checkIfRetracted(gnode) {
 //     if (retractedCids[gnode.Cid] && retractedCids[gnode.Cid][gnode.ProfileId]) {
 //         return true
@@ -369,6 +427,7 @@ function prepareDomElements(gnode) {
     entryContainer.title = makeGnodeTitle(gnode)
     let gnodeDomElements = {
         container: entryContainer,
+        tsTextnode: document.createTextNode(cheesyDate(gnode.jsDate) + " ")
     }
     gnode.domElements = gnodeDomElements
     addPostPTag(gnode, gnodeDomElements)
@@ -467,9 +526,11 @@ function addFollowsTag(gnode, gnodeDomElements) {
         let followsDiv = document.createElement("div")
         for (var j = 0; j < gnode["publicfollow"].length; j++) {
             let followedProfileId = gnode["publicfollow"][j]
-            let followText = cheesyDate(gnode.jsDate) + " " + dispName + ": Follow of " + followedProfileId
-            let ptag = document.createElement("p");
+            // let followText = cheesyDate(gnode.jsDate) + " " + dispName + ": Follow of " + followedProfileId
+            let followText = dispName + ": Follow of " + followedProfileId
             let textnode = document.createTextNode(followText);
+            let ptag = document.createElement("p");
+            ptag.appendChild(gnodeDomElements.tsTextnode)
             ptag.appendChild(textnode);
             followsDiv.appendChild(ptag)
             gnodeDomElements["follows"][followedProfileId] = ptag
@@ -484,8 +545,7 @@ function addPostPTag(gnode, gnodeDomElements) {
         return null
     }
     var ptag = document.createElement("p");
-    var tsTextnode = document.createTextNode(cheesyDate(gnode.jsDate) + " ")
-
+    ptag.appendChild(gnodeDomElements.tsTextnode);
 
     let postPreviewTextnode
     if (gnode.post) {
@@ -497,8 +557,6 @@ function addPostPTag(gnode, gnodeDomElements) {
 
     gnodeDomElements.postPtag = ptag
     gnodeDomElements.postTextNode = postPreviewTextnode
-
-    ptag.appendChild(tsTextnode);
 
     if (gnode.ProfileId != selectedIdentityProfileId) {
         gnodeDomElements.unfollowButton = makeATag("U", function (profileId) {
@@ -555,7 +613,7 @@ function addRePostPTag(gnode, gnodeDomElements) {
         return null
     }
     // var ptag = document.createElement("p");
-    let previewTextnode = document.createTextNode(getRepostPreviewText(gnode));
+    let previewTextnode = document.createTextNode(getRepostPreviewText(gnode))
     let labelTextnode = document.createTextNode("[REPOST OF] ");
 
     // ptag.appendChild(textnode);
@@ -617,7 +675,8 @@ function updateTimelinePost(gnode) {
     gnode.domElements.postTextNode.textContent = getNodePreviewText(gnode)
 }
 function updateTimelineRepost(gnode) {
-    if (!gnode.domElements || !gnode.domElements.repostTextNode) {
+    // if (!gnode.domElements || !gnode.domElements.repostTextNode) {
+    if (!gnode.domElements || !gnode.domElements.repostTextNode || !gnode.reposteeProfile) {
         return
     }
     console.log("updateTimelineRepost: here1")
@@ -641,15 +700,17 @@ function updateTimelineRepost(gnode) {
     }
 }
 
-
 function updateTlFolloweeInfo(gnode) {
+    if (!gnode.followeeProfileInfo || !gnode.domElements.follows) {
+        return
+    }
     console.log("updateTlFolloweeInfo ...")
     let dispName = (gnode.profile && gnode.profile.DisplayName) ? gnode.profile.DisplayName : "[NODATA]"
     for (let followeeProfileCid of Object.keys(gnode.followeeProfileInfo)) {
         let pTagtoUpdate = gnode.domElements.follows[followeeProfileCid]
-        let textNode = pTagtoUpdate.childNodes[0]
-        let followeeDispName = gnode.followeeProfileInfo[followeeProfileCid].DisplayName
-        textNode.textContent = cheesyDate(gnode.jsDate) + " " + dispName + ": Follow of " + followeeDispName
+        let textNode = pTagtoUpdate.childNodes[1] //0 = the ts textnode, 1 = the follow display textnode
+        let followeeDispName = gnode.followeeProfileInfo[followeeProfileCid].DisplayName || "[UNOBTAINABLE]"
+        textNode.textContent = dispName + ": Follow of " + followeeDispName
     }
 }
 // function updateTlFolloweeInfo(gnode) {
@@ -732,16 +793,6 @@ function xbinaryInsert(array, insertValue, comparator, domBlaster) {
     // console.log("typ3", array)
     domBlaster(right, insertValue)
     return array
-}
-
-function resetTextTimelineArea() {
-    let target = document.getElementById("timeline")
-    target.textContent = "" //apparently not the worst way to make all the existing child elements go away before we render the updated history.
-    orderedTimelineElements = []
-    gnReplyParents = {}
-    repostedCids = {}
-    follows = {}
-    unfollows = {}
 }
 
 function displayTimelineTexts(orderedHistory) {

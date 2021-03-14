@@ -22,8 +22,11 @@ async function setIdentity(keyname) {
         }
     }
 
-    //TODO restore the other identity fields here
-    displayTimelineTextsFromServer("[]")
+    if (timelineUpdaterInterval) {
+        clearInterval(timelineUpdaterInterval)
+    }
+    resetTextTimelineArea()
+    // displayTimelineTextsFromServer("[]")
     identity = identities[selectedIdentity]
 
     pubTextarea = document.getElementById("pubkeyb64")
@@ -77,9 +80,12 @@ async function setIdentity(keyname) {
         console.log("failed to set selectedIdentity indexeddb ??", err);
     }
 
-    let latestTimelineTextsJson = await getLatestTimelineTexts(identity["pub"], identity["profiletip"])
-    // console.log(latestTimelineTextsJson)
-    displayTimelineTextsFromServer(latestTimelineTextsJson)
+    // let latestTimelineTextsJson = await getLatestTimelineTexts(identity["pub"], identity["profiletip"])
+    // displayTimelineTextsFromServer(latestTimelineTextsJson)
+    await loadJsTimeline()
+    timelineUpdaterInterval = setInterval(() => {
+        updateJsTimeline()
+    }, 60000)
 }
 
 async function newIdentity() {
@@ -182,7 +188,13 @@ function unselectIdentity() {
     document.getElementById("followprofileid").value = ""
     document.getElementById("pubkeyb64").innerHTML = ""
     document.getElementById("privkeyb64").innerHTML = ""
-    displayTimelineTextsFromServer("[]")
+
+    if (timelineUpdaterInterval) {
+        clearInterval(timelineUpdaterInterval)
+    }
+
+    resetTextTimelineArea()
+    // displayTimelineTextsFromServer("[]")
     document.getElementById("currentprofile_detail").style.display = "none"
     document.getElementById("importprivkeyb64_container").style.display = "inline"
 }
