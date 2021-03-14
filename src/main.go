@@ -27,9 +27,9 @@ func main() {
 	go func() {
 		//these are each going to do IPNS stuff so dont want them running concurrently. (just seems to lead to context timeouts)
 		Federation.Init()
-		service.setupExtendedWl()
+		go service.setupExtendedWl()
 		log.Printf("Federation membership size: %d", len(Federation.Members))
-		Federation.RunBackgroundUpdateFetcherProcessor()
+		go Federation.RunBackgroundUpdateFetcherProcessor()
 	}()
 	service.Start()
 }

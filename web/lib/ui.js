@@ -242,6 +242,9 @@ async function createProfilePost() {
 }
 
 async function loadServerHistory() {
+    if (!confirm("actually load history from server?")) {
+        return
+    }
     let identity = identities[selectedIdentity]
     let latestTimelineTextsJson = await getLatestTimelineTexts(identity["pub"], identity["profiletip"])
     displayTimelineTextsFromServer(latestTimelineTextsJson)

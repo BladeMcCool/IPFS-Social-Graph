@@ -252,7 +252,7 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 
 func (tl *Timeline) LoadHistory() error {
 	start := time.Now()
-	graphNodeHistory, err := tl.fetchGraphNodeHistory(tl.profile)
+	graphNodeHistory, err := tl.fetchGraphNodeHistory(tl.profile, true)
 	if err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func (tl *Timeline) LoadHistory() error {
 				return
 			}
 			log.Printf("collecting profile history for %s followee #%d: %s...", tl.profile.DisplayName, idx, followeeProfile.DisplayName)
-			followeeGraphNodeHistory, err := tl.fetchGraphNodeHistory(followeeProfile)
+			followeeGraphNodeHistory, err := tl.fetchGraphNodeHistory(followeeProfile, true)
 			if err != nil {
 				queue <- tlFolloweeWithHistory{error: err, profileId: followeeProfileId}
 				return
@@ -525,19 +525,19 @@ func (tl *Timeline) extractFollowsProfileCids(history []*TlGraphNode) []string {
 	return finalFollows
 }
 
-func (tl *Timeline) fetchGraphNodeHistory(profile *TLProfile) ([]*TlGraphNode, error) {
+func (tl *Timeline) fetchGraphNodeHistory(profile *TLProfile, getPreviews bool) ([]*TlGraphNode, error) {
 	start := time.Now()
 
 	var graphNodeHistory []*TlGraphNode
 	currentCid := profile.GraphTip
-	log.Printf("trace history for %s, starting with tip cid %s", profile.DisplayName, currentCid)
+	log.Printf("fetchGraphNodeHistory for %s, starting with tip cid %s", profile.DisplayName, currentCid)
 	var lastIterTlGraphNode *TlGraphNode = nil
 	_ = lastIterTlGraphNode
 	for {
-		log.Printf("history for %s, fetching graphnode with cid %s", profile.Id, currentCid)
+		log.Printf("fetchGraphNodeHistory for %s, fetching graphnode with cid %s", profile.Id, currentCid)
 		currentGraphNode, err := tl.fetchGraphNodeFromIPFS(currentCid)
 		if err != nil {
-			log.Printf("error getting cid for graphnode: %s", err.Error())
+			log.Printf("fetchGraphNodeHistory: error getting cid %s for graphnode: %s", currentCid, err.Error())
 			return nil, err
 		}
 
@@ -551,21 +551,25 @@ func (tl *Timeline) fetchGraphNodeHistory(profile *TLProfile) ([]*TlGraphNode, e
 			profile: profile,
 			cid: currentCid,
 		}
-		if currentGraphNode.Post != nil {
-			tlGraphNode.PreviewText, err = tl.createPostPreview(currentGraphNode.Post)
-			if err != nil {
-				tlGraphNode.PreviewText += " (error)"
+		if getPreviews {
+			if currentGraphNode.Post != nil {
+				tlGraphNode.PreviewText, err = tl.createPostPreview(currentGraphNode.Post)
+				if err != nil {
+					tlGraphNode.PreviewText += " (error)"
+				}
 			}
-		}
-		if currentGraphNode.RepostOfNodeCid != nil {
-			separator := ""
-			if currentGraphNode.Post != nil { separator = " " }
-			repostPreview, repostTlGn, err := tl.createRePostPreview(*currentGraphNode.RepostOfNodeCid)
-			if err != nil {
-				repostPreview += " (error)"
+			if currentGraphNode.RepostOfNodeCid != nil {
+				separator := ""
+				if currentGraphNode.Post != nil {
+					separator = " "
+				}
+				repostPreview, repostTlGn, err := tl.createRePostPreview(*currentGraphNode.RepostOfNodeCid)
+				if err != nil {
+					repostPreview += " (error)"
+				}
+				tlGraphNode.PreviewText += separator + "[:::REPOST:::] " + repostPreview
+				tlGraphNode.repostof = repostTlGn
 			}
-			tlGraphNode.PreviewText += separator + "[:::REPOST:::] " + repostPreview
-			tlGraphNode.repostof = repostTlGn
 		}
 		if lastIterTlGraphNode != nil {
 			lastIterTlGraphNode.previousNode = tlGraphNode

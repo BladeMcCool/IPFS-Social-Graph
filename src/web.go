@@ -170,27 +170,54 @@ func (s *APIService) setupWl() {
 	log.Printf("setupWl added %d profiles to the approved list", len(s.BaseWlProfileIdList))
 }
 func (s *APIService) setupExtendedWl() {
-	start := time.Now()
-	wg := sync.WaitGroup{}
-	//added := map[string]int64{}
-	for _, profileId := range s.BaseWlProfileIdList {
-		log.Printf("setupExtendedWl adding %s, going to see the followee profileIds", profileId)
-		wg.Add(1)
-		go func(profileId string) {
-			historyWls := s.getHistoryFollows(profileId)
-			for _, followeePprofileId := range historyWls {
-				s.WlProfileIdMutex.Lock()
-				s.WlProfileIds[followeePprofileId] = true
-				//added[profileId]++
-				s.WlProfileIdMutex.Unlock()
-			}
-			log.Printf("setupExtendedWl added %d entries on behalf of profileId %s", len(historyWls), profileId)
-			wg.Done()
-		}(profileId)
+	minCycleTimeSec := float64(90)
+	log.Println("setupExtendedWl starting up")
+	for {
+
+		start := time.Now()
+		wg := sync.WaitGroup{}
+
+		newWlMu := sync.Mutex{}
+		newWlProfileIds := map[string]bool{}
+		//s.WlProfileIdMutex.Lock()
+		//s.WlProfileIds =
+		//s.WlProfileIdMutex.Unlock()
+
+		//added := map[string]int64{}
+		log.Printf("setupExtendedWl total number of wl profiles in extended wl before processing update: %d", len(s.WlProfileIds))
+		for _, profileId := range s.BaseWlProfileIdList {
+			log.Printf("setupExtendedWl going to add followees of baseWl profileid %s", profileId)
+			wg.Add(1)
+			go func(profileId string) {
+				historyWls := s.getHistoryFollows(profileId)
+				newWlMu.Lock()
+				newWlProfileIds[profileId] = true
+				for _, followeePprofileId := range historyWls {
+					newWlProfileIds[followeePprofileId] = true
+					log.Printf("setupExtendedWl baseWl %s follow of %s (add to wl)", profileId, followeePprofileId)
+				}
+				newWlMu.Unlock()
+				log.Printf("setupExtendedWl added %d entries on behalf of profileId %s", len(historyWls), profileId)
+				wg.Done()
+			}(profileId)
+		}
+		wg.Wait()
+		log.Printf("setupExtendedWl: finished after %.2f sec", time.Since(start).Seconds())
+		s.WlProfileIdMutex.Lock()
+		s.WlProfileIds = newWlProfileIds
+		log.Printf("setupExtendedWl total number of wl profiles in extended wl after processing update: %d", len(s.WlProfileIds))
+		s.WlProfileIdMutex.Unlock()
+
+		tookSec := time.Since(start).Seconds()
+		log.Printf("setupExtendedWl took %.2f sec to complete this cycle getting wl extension from %d BaseWlProfileIdListed profile histories", tookSec, len(s.BaseWlProfileIdList))
+		if tookSec < minCycleTimeSec {
+			// make sure we don't slam it more than we have to.
+			time.Sleep(time.Duration(minCycleTimeSec-tookSec) * time.Second)
+		}
+
 	}
-	wg.Wait()
-	log.Printf("setupExtendedWl: finished after %.2f sec", time.Since(start).Seconds())
 }
+
 func (s *APIService) getHistoryFollows(profileId string) []string {
 	tl := &Timeline{
 		crypter:   Crypter,
@@ -202,7 +229,7 @@ func (s *APIService) getHistoryFollows(profileId string) []string {
 		log.Printf("getHistoryFollows loadProfile error: %s", err.Error())
 		return nil
 	}
-	graphNodeHistory, err := tl.fetchGraphNodeHistory(tl.profile)
+	graphNodeHistory, err := tl.fetchGraphNodeHistory(tl.profile, false)
 	if err != nil {
 		log.Printf("getHistoryFollows fetchGraphNodeHistory error: %s", err.Error())
 		return nil
@@ -220,6 +247,7 @@ func (s *APIService) WlProfileIdViaPubkeyHeaderAuthMiddleware(next http.Handler)
 			return
 		}
 
+		log.Printf("middleware debug: %#v", r.URL)
 		profileId, onWl := s.checkHeaderForPubkeyOnWl(r.Header.Get("X-Pubkey-B64"))
 		if !onWl {
 			log.Printf("FORBIDDEN Profileid '%s' not on wl.", profileId)
@@ -565,8 +593,6 @@ type UpdateProfileCidJsonArgs struct {
 	ProfileTip string
 }
 func (s *APIService) updateProfileCid(w http.ResponseWriter, r *http.Request) {
-
-
 	var err error
 	log.Printf("updateProfileCid 3 start")
 	args := &UpdateProfileCidJsonArgs{}
@@ -683,6 +709,7 @@ func (s *APIService) history(w http.ResponseWriter, r *http.Request) {
 		ipfs:      IPFS,
 		profileId: Crypter.getPeerIDBase58FromPubkey(pubkey),
 	}
+	log.Printf("history for profileId %s", fakeTl.profileId)
 	fakeTl.profile, err = fakeTl.fetchCheckProfile(fakeTl.profileId, &args.ProfileTip)
 	log.Printf("fakeTl.profile: %#v", fakeTl.profile.follows)
 	if err != nil {
@@ -717,6 +744,7 @@ func (s *APIService) profileBestTipCid(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	log.Printf("profileBestTipCid here to get best tip for profile id %s", args.ProfileId)
 
 	// check cache before federation
 	profileCidPtr, _ := IPFS.determineProfileCid(args.ProfileId)
