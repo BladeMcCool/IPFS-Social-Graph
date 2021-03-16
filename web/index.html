@@ -1,59 +1,219 @@
 <html>
 <head>
-<script src="./lib/ipfs.bundle.js"></script>
-<script src="./lib/localforage.min.js"></script>
-<script src="./lib/peerutil.bundle.js"></script>
-<script src="./lib/uint8ArrayConcat.js"></script>
-<script src="./lib/stablejson.bundle.js"></script>
-<script src="./lib/binary-insert.js"></script>
-<script src="./lib/pool.js"></script>
-<script src="./lib/ui.js"></script>
-<script src="./lib/server.js"></script>
-<script src="./lib/crypto.js"></script>
-<script src="./lib/identity.js"></script>
-<script src="./lib/ipfs.js"></script>
-<script src="./lib/timeline.js"></script>
-<style></style>
+  <script src="./lib/ipfs.bundle.js"></script>
+  <script src="./lib/localforage.min.js"></script>
+  <script src="./lib/peerutil.bundle.js"></script>
+  <script src="./lib/uint8ArrayConcat.js"></script>
+  <script src="./lib/stablejson.bundle.js"></script>
+  <script src="./lib/binary-insert.js"></script>
+  <script src="./lib/jdenticon.min.js"></script>
+  <script src="./lib/pool.js"></script>
+  <script src="./lib/ui.js"></script>
+  <script src="./lib/server.js"></script>
+  <script src="./lib/crypto.js"></script>
+  <script src="./lib/identity.js"></script>
+  <script src="./lib/ipfs.js"></script>
+  <script src="./lib/timeline.js"></script>
+  <style>
+    .wrapper {
+      display: grid;
+      grid-template-columns: 50px auto;
+      /*grid-template-rows: 50px;*/
+    }
+    div.wrapper  { border: 0px solid black; }
+    /*.wrapper .hamburgers {*/
+    /*    grid-row-start: 1;*/
+    /*    grid-row-end: 3;*/
+    /*}*/
+    div.hamburgers { background-color: gray; color: lightgray }
+
+    .tlentry {
+      /*border: 10px solid black;*/
+      display: grid;
+      grid-template-columns: 50px auto;
+      /*grid-template-rows: 100px auto;*/
+      margin-bottom: 0px;
+      padding-bottom: 0px;
+      /*grid-template-rows: 10% 80% 10%;*/
+    }
+    #rightpane { padding-left: 10px; }
+    .tlentry .tallboy {
+      grid-row-start: 2;
+      grid-row-end: 7;
+    }
+    .tlentry .repostnotespan {
+      grid-column-start: 1;
+      grid-column-end: 3;
+      padding: 0px;
+      /*height: 18px;*/
+    }
+
+    /*.tlentry .buttonarea { padding-top: 5px; }*/
+    /*.tlentry .buttonarea a {*/
+    /*  text-decoration: none;*/
+    /*  margin-right: 5px;*/
+    /*}*/
+    .composearea {
+      display: grid;
+      grid-template-columns: auto 50px;
+      grid-template-rows: 20px auto;
+    }
+    .composearea .profilename {
+      grid-column-start: 1;
+      grid-column-end: 3;
+    }
+    .composearea .profilename p { margin: 0px; }
+
+    .composearea div { border: 0px solid black; }
+    .composearea input {
+      border: 1px solid lightgray;
+      width: 100%;
+      height: 100%;
+      font-size: 20px;
+    }
+    .repostcontainer {
+      border-radius: 3px;
+      margin-right: 10px;
+    }
+
+    div.tlentry { margin-right: 10px; }
+    /*.tlentry  div { border: 0px solid green; }*/
+    .tlentry svg.bigicon { width: 50px; height: 50px; }
+    svg.smallicon { vertical-align: middle; display: inline-block; width:20px; height: 20px; border: 0px solid black; margin: auto; }
+
+    .collapsed {
+      /*border: 2px solid blue;*/
+      background: #fff;
+      overflow: hidden;
+
+      transition: all .5s ease-in-out;
+      line-height: 0;
+      padding: 0;
+      border: 0;
+      color: transparent;
+
+      margin-bottom: 0px;
+      border: 0px;
+    }
+    .collapsed .buttonarea a {
+      color: transparent !important;
+      transition: color .5s ease-in-out;
+    }
+    .collapsed .replyrow {
+      padding-top: 0px !important;
+      transition: color .5s ease-in-out;
+    }
+    .collapsed .repostcontainer {
+      border: 0px solid lightseagreen !important;
+      transition: border .5s ease-in-out;
+    }
+
+    .collapsed svg.bigicon {
+      height: 0px !important;
+      transition: height .5s ease-in-out;
+    }
+    .collapsed svg.smallicon {
+      height: 0px !important;
+      transition: height .5s ease-in-out;
+    }
+    .expanded {
+      transition: all .5s ease-in-out;
+      margin-bottom: 10px;
+      border: 1px solid lightseagreen;
+      border-radius: 5px;
+      line-height: 1.1;
+      padding-top: 0em;
+      padding-bottom: 0em;
+      color: black;
+    }
+    .expanded .replyrow {
+      padding-top: 10px;
+      transition: padding-top .5s ease-in-out;
+    }
+    .expanded .buttonarea a {
+      color: black;
+      transition: color .5s ease-in-out;
+    }
+    .expanded svg.bigicon {
+      height: 50px;
+      transition: height .5s ease-in-out;
+    }
+    .expanded svg.smallicon {
+      height: 20px;
+      transition: height .5s ease-in-out;
+    }
+    .expanded .repostcontainer {
+      border: 1px solid lightseagreen;
+      transition: border .5s ease-in-out;
+    }
+
+    body {
+      font-family: sans-serif;
+      font-size: 10pt;
+      margin: 0;
+      padding: 0;
+    }
+    a { text-decoration: none }
+    /*reference because i will _never_ remember this.*/
+    /*padding: <padding-top> || <padding-right> || <padding-bottom> || <padding-left>*/
+  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
   <!-- shameless table layout in the year 2021 . i welcome the css layout PR. -->
-  <table>
-    <tr>
-      <td valign="top" id="form">
-        <p>
-          <button onclick="loadJsTimeline()">Js History</button>
-          <button onclick="loadServerHistory()">From-server History</button>
-        </p>
-        <hr>
+  <div class="wrapper">
+    <div class="hamburgers" onclick="menuswap()" style="text-align: center; cursor:pointer;"><p>&#x2630;</p></div>
+    <div id="rightpane">
 
-        <p>Display name:&nbsp;<input type="text" id="dispname" name="dispname"></p>
-        <p>Bio:&nbsp;<input type="text" id="bio" name="bio"></p>
-        <p>Post text:&nbsp;<input type="text" id="posttext" name="posttext"></p>
-        <p>In Reply To :&nbsp;<input type="text" id="inreplyto" name="inreplyto">&nbsp;<button onclick="clearReply()">Clear</button></p>
-        <p>Follow ProfileId:&nbsp;<input type="text" id="followprofileid" name="followprofileid">&nbsp;<button onclick="clearFollow()">Clear</button></p><!-- a ProfileId -->
-        <p>Unfollow ProfileId:&nbsp;<input type="text" id="unfollowprofileid" name="unfollowprofileid">&nbsp;<button onclick="clearUnfollow()">Clear</button></p><!-- a ProfileId -->
-        <p>Retract Node Cid:&nbsp;<input type="text" id="retractionofnodecid" name="retractionofnodecid">&nbsp;<button onclick="clearRetraction()">Clear</button></p><!-- a graphnode cId -->
-        <p>Repost Node Cid:&nbsp;<input type="text" id="repostofnodecid" name="repostofnodecid">&nbsp;<button onclick="clearRepost()">Clear</button></p><!-- a graphnode cId -->
-        <p style="display:none">Like Node Cid:&nbsp;<input type="text" id="likeofnodecid" name="likeofnodecid">&nbsp;<button onclick="clearLike()">Clear</button></p><!-- a graphnode cId -->
-        <p style="display:none">Unlike Node Cid::&nbsp;<input type="text" id="unlikeofnodecid" name="unlikeofnodecid">&nbsp;<button onclick="clearUnlike()">Clear</button></p><!-- a graphnode cId -->
+      <div id="mainuipane">
+        <div id="mainthing" class="composearea">
+          <div class="profilename"><p id="profilename"><svg class="smallicon"></svg> </p></div>
+          <div style="padding: 4px 4px 10px 0px;"><input type="text" id="posttext" name="posttext"></div>
+          <div style="border: 0px solid pink; margin: 0px"><p style="font-size: 30px; margin: -5px 0px 0px 0px; cursor:pointer;" onclick="createProfilePost()" >&#x1f4e8;</p></div>
+        </div>
+        <div id="tlcontainer">
 
-        <p>
-          <button onclick="createProfilePost()">Create Profile Post</button>
-          <!-- hidden -- too much ipns publishing seems to be bad. also this is pretty insecure anyway. -->
-          <span style="display: none;"><input disabled  type="checkbox" id="sendprivkey" name="sendprivkey" value="sendprivkey"><label title="Temporary hacks to facilitate functionality, probably only safe for use with server under your control on localhost or via https. Ideally the server never sees our private key though, only use this experimentally." for="sendprivkey">Send my <b>private key to the server</b> so that it can sign/publish my IPNS</label></span>
-        </p>
-        <hr>
-        <p>
-          <button onclick="newIdentity()">New Identity</button>&nbsp;
-          <input type="text" id="newidentname" name="newidentname">&nbsp;
-          <select name="chooseident" id="chooseident" onchange="chooseIdentity(this.value)">
-            <option value="">Choose ...</option>
-          </select>          
-          <button onclick="deleteSelectedIdentity()">Delete Identity</button>&nbsp;
-          <button onclick="renameSelectedIdentity()">Rename Identity</button>&nbsp;
-        </p>
+        </div>
+      </div>
+      <div id="menuthing" style="display:none">
 
-        <span id="importprivkeyb64_container" style="display: none">
+        <table>
+          <tr>
+            <td valign="top" id="form">
+              <p>
+                <button onclick="loadJsTimeline()">Js History</button>
+                <button onclick="loadServerHistory()">From-server History</button>
+              </p>
+              <hr>
+
+              <p>Display name:&nbsp;<input type="text" id="dispname" name="dispname"></p>
+              <p>Bio:&nbsp;<input type="text" id="bio" name="bio"></p>
+              <p style="display: none">Post text:&nbsp;<input type="text" id="posttext-old" name="posttext-old"></p>
+              <p>In Reply To :&nbsp;<input type="text" id="inreplyto" name="inreplyto">&nbsp;<button onclick="clearReply()">Clear</button></p>
+              <p>Follow ProfileId:&nbsp;<input type="text" id="followprofileid" name="followprofileid">&nbsp;<button onclick="clearFollow()">Clear</button></p><!-- a ProfileId -->
+              <p>Unfollow ProfileId:&nbsp;<input type="text" id="unfollowprofileid" name="unfollowprofileid">&nbsp;<button onclick="clearUnfollow()">Clear</button></p><!-- a ProfileId -->
+              <p>Retract Node Cid:&nbsp;<input type="text" id="retractionofnodecid" name="retractionofnodecid">&nbsp;<button onclick="clearRetraction()">Clear</button></p><!-- a graphnode cId -->
+              <p>Repost Node Cid:&nbsp;<input type="text" id="repostofnodecid" name="repostofnodecid">&nbsp;<button onclick="clearRepost()">Clear</button></p><!-- a graphnode cId -->
+              <p style="display:none">Like Node Cid:&nbsp;<input type="text" id="likeofnodecid" name="likeofnodecid">&nbsp;<button onclick="clearLike()">Clear</button></p><!-- a graphnode cId -->
+              <p style="display:none">Unlike Node Cid::&nbsp;<input type="text" id="unlikeofnodecid" name="unlikeofnodecid">&nbsp;<button onclick="clearUnlike()">Clear</button></p><!-- a graphnode cId -->
+
+              <p>
+                <button onclick="createProfilePost()">Create Profile Post</button>
+                <!-- hidden -- too much ipns publishing seems to be bad. also this is pretty insecure anyway. -->
+                <span style="display: none;"><input disabled  type="checkbox" id="sendprivkey" name="sendprivkey" value="sendprivkey"><label title="Temporary hacks to facilitate functionality, probably only safe for use with server under your control on localhost or via https. Ideally the server never sees our private key though, only use this experimentally." for="sendprivkey">Send my <b>private key to the server</b> so that it can sign/publish my IPNS</label></span>
+              </p>
+              <hr>
+              <p>
+                <button onclick="newIdentity()">New Identity</button>&nbsp;
+                <input type="text" id="newidentname" name="newidentname">&nbsp;
+                <select name="chooseident" id="chooseident" onchange="chooseIdentity(this.value)">
+                  <option value="">Choose ...</option>
+                </select>
+                <button onclick="deleteSelectedIdentity()">Delete Identity</button>&nbsp;
+                <button onclick="renameSelectedIdentity()">Rename Identity</button>&nbsp;
+              </p>
+
+              <span id="importprivkeyb64_container" style="display: none">
           <p>Private Key for Import base64:&nbsp;
             <textarea id="importprivkeyb64" name="importprivkeyb64"></textarea>
             <button onclick="importKeyAsIdentity()">Import Private Key as Identity</button>&nbsp;
@@ -61,25 +221,64 @@
         </span>
 
 
-        <span id="currentprofile_detail">
+              <span id="currentprofile_detail">
           <p>Public Key base64:&nbsp;<textarea id="pubkeyb64" name="pubkeyb64" disabled></textarea></p>
           <p>Private Key base64:&nbsp;<textarea id="privkeyb64" name="privkeyb64" disabled></textarea></p>
-          <!-- <p>Both keys, custom PEM format:&nbsp;<textarea id="pemishout" name="pemishout" disabled></textarea></p> -->
+                <!-- <p>Both keys, custom PEM format:&nbsp;<textarea id="pemishout" name="pemishout" disabled></textarea></p> -->
           <p>Profile Id:&nbsp;<input type="text" id="profileid" name="profileid" size="50" disabled></p>
           <p>Profile Tip:&nbsp;<input type="text" id="profiletip" name="profiletip" size="50" disabled></p>
           <p>Graph Tip:&nbsp;<input type="text" id="graphtip" name="graphtip" size="50" disabled></p>
           <p>IPNSDelegate&nbsp;<input type="text" id="ipnsdelegate" name="ipnsdelegate" size="50" disabled></p>
         </span>
-        <hr>
-        <!-- if you feel inspired to implement the stuff the server does in js using ipfs-js, i'd welcome a pr. ipns publish doesnt seem to work from the browser tho, which is kind of the primary motivation behind the server thing in the first place. -->
-        <p>Service Base Url :&nbsp;<input type="text" id="servicebaseurl" name="servicebaseurl" size="50" onblur="saveServiceBaseUrl()"></p>
-        <p><a href="https://github.com/BladeMcCool/IPFS-Social-Graph" target="_blank">Project Github</a></p>
-      </td>
-      <td valign="top">
-        <span id="timeline"></span>
-      </td>
-    </tr>
-  </table>
+              <hr>
+              <!-- if you feel inspired to implement the stuff the server does in js using ipfs-js, i'd welcome a pr. ipns publish doesnt seem to work from the browser tho, which is kind of the primary motivation behind the server thing in the first place. -->
+              <p>Service Base Url :&nbsp;<input type="text" id="servicebaseurl" name="servicebaseurl" size="50" onblur="saveServiceBaseUrl()"></p>
+              <p><a href="https://github.com/BladeMcCool/IPFS-Social-Graph" target="_blank">Project Github</a></p>
+            </td>
+            <td valign="top">
+              <span id="timeline"></span>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+    </div>
+
+    <div id="telentry_template" style="display:none">
+      <div class="tlentry collapsed">
+        <div class="repostnotespan" style="height: 0px">
+          <div style="vertical-align: top;">
+            <svg class="smallicon" style="display: none"></svg>
+            <p class="reposterinfo" style="vertical-align: middle; display: inline-block; border: 0px solid black; margin: 0px;"></p>
+          </div>
+        </div>
+        <div class="tallboy"><svg class="bigicon"></svg></div>
+        <div class="stdpostinfo"></div>
+        <div class="stdpostcontent"></div>
+        <div class="repostcontainer" style="display: none">
+          <div style="vertical-align: top;">
+            <svg class="smallicon" style="display: none"></svg>
+            <p class="reposteeinfo" style="vertical-align: middle; display: inline-block; border: 0px solid black; margin: 0px;"></p>
+            <p class="repostpreview" style="border: 0px solid black; margin: 0px;"></p>
+          </div>
+        </div>
+        <!-- follow: &#x1f465; reply: &#x1f5e8; repost: &#x1f504; unfollow: &#x274c; retract: &#x1f5d1; -->
+        <div class="buttonarea"></div>
+        <div class="replyrow"></div>
+      </div>
+    </div>
+
+  </div>
+
+
+
+  <button onclick="toggle(1)">1</button>
+  <button onclick="toggle(2)">2</button>
+  <button onclick="toggle(3)">3</button>
+  <button onclick="toggle(4)">4</button>
+  <button onclick="toggle(5)">5</button>
+
+
 </body>  
 </body>
 </html>

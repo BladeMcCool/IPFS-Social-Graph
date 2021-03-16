@@ -4,6 +4,8 @@ var importPubkey
 let selectedIdentityProfileId
 let timelineUpdaterInterval
 
+let tlEntryTemplate
+
 let orderedTimelineElements = []
 let retractedCids = {} //map cid to person who retracted it. just need to only retract things that are done by their owners.
 let gnReplyParents = {}
@@ -17,7 +19,7 @@ let profileTipCache = {}
 let gnOfInterestByProfileId = {}
 
 function resetTextTimelineArea() {
-    let target = document.getElementById("timeline")
+    let target = document.getElementById("tlcontainer")
     target.textContent = "" //apparently not the worst way to make all the existing child elements go away before we render the updated history.
     orderedTimelineElements = []
     gnReplyParents = {}
@@ -230,6 +232,13 @@ async function createProfilePost() {
     scrapeSettingsIntoSelectedIdentity() //so that when we updateSavedIdentites we keep whatever was in the fields.
     await updateSavedIdentites(identities)
 
+    if (inputFlds["followprofileid"]) {
+        delete unfollows[inputFlds["followprofileid"]] //otherwise spidering code will not re-add anything that was previously unfollowed.
+    }
+    // followprofileid
+    // unfollowprofileid
+    // getFolloweeProfileInfo
+
     document.getElementById("posttext").value = ""
     clearReply()
     clearFollow()
@@ -246,6 +255,7 @@ async function loadServerHistory() {
         return
     }
     let identity = identities[selectedIdentity]
+    displayTimelineTextsFromServer("[]")
     let latestTimelineTextsJson = await getLatestTimelineTexts(identity["pub"], identity["profiletip"])
     displayTimelineTextsFromServer(latestTimelineTextsJson)
 }
@@ -336,6 +346,7 @@ function performDomInsertion(gnode) {
     }
 
     if (includeInMainTl) {
+        gnode.includeInMainTl = true
         let mainTlcompare = (a, b) => {
             return a.jsDate > b.jsDate ? -1 : 1
         }
@@ -382,18 +393,39 @@ function addNoTsGnode(gnode) {
 function fixMissingTsItemsRelatedTo(profileId, foundTs) {
     if (!noTsGnodes[profileId]) { return }
     let jsDate = new Date(foundTs)
-    let timelineEl = document.getElementById("timeline")
+    let timelineEl = document.getElementById("tlcontainer")
     for (let i = 0; i < noTsGnodes[profileId].length; i++) {
         let gnode = noTsGnodes[profileId][i]
 
         //we need to:
         try {
-            //  remove it from the dom
-            timelineEl.removeChild(gnode.domElements.container)
-            //  remove it from the ordered array
-            orderedTimelineElements.splice(orderedTimelineElements.indexOf(gnode), 1)
+
+            if (gnode.includeInMainTl) {
+                //  remove it from the dom
+                timelineEl.removeChild(gnode.domElements.container)
+                //  remove it from the ordered array
+                orderedTimelineElements.splice(orderedTimelineElements.indexOf(gnode), 1)
+            } else {
+                console.log("unsure at this time how to remove and reinsert from non maintl stuff.")
+                continue
+
+                // wait i'm concerned with replies in the code below but i dont think it really applies. because replies will be timestamped already durr
+                // i thought the code below would work, but still getting errors. i think retractions are causing it.
+                // if there actually are any nested things that arent sorting right due to lack of ts then some code like below might help locate.
+                // let replyParent = gnReplyParents[gnode.Cid]
+                // let replyContainer = replyParent.domElements.replyContainer //if we're in here the gnReplyParent, either real target or a temp dummy one, must already exist.
+                // if (replyContainer.contains(gnode.domElements.container)) {
+                //     // I'm not sure this is working.
+                //     replyContainer.removeChild(gnode.domElements.container)
+                //     replyParent.replies.splice(replyParent.replies.indexOf(gnode), 1)
+                //     console.log("YAY?")
+                // }
+            }
+
+
+
         } catch(e) {
-            console.log(`fixMissingTsItemsRelatedTo error like ${e.message}`)
+            console.log("fixMissingTsItemsRelatedTo error", e)
         }
         //  fix the ts (set .jsDate and .Date)
         gnode.Date = foundTs
@@ -426,12 +458,18 @@ function createReplyContainerDiv() {
 }
 
 function prepareDomElements(gnode) {
-    let entryContainer = document.createElement("div")
+    // let entryContainer = document.createElement("div")
+    let entryContainer = tlEntryTemplate.cloneNode(true)
     entryContainer.title = makeGnodeTitle(gnode)
+
     let gnodeDomElements = {
         container: entryContainer,
         tsTextnode: document.createTextNode(cheesyDate(gnode.jsDate) + " ")
     }
+    let bigicon = entryContainer.querySelector(".bigicon")
+    bigicon.setAttribute("data-jdenticon-value", gnode.ProfileId)
+    jdenticon.update(bigicon)
+
     gnode.domElements = gnodeDomElements
     addPostPTag(gnode, gnodeDomElements)
     addRePostPTag(gnode, gnodeDomElements)
@@ -447,7 +485,9 @@ function prepareDomElements(gnode) {
     }
     //replace any dummy-reply-holder with ourself now.
     gnReplyParents[gnode.Cid] = gnode
-    entryContainer.appendChild(gnode.domElements.replyContainer)
+    entryContainer.id = "entry" + Object.keys(gnReplyParents).length
+    let replyRow = entryContainer.querySelector(".replyrow")
+    replyRow.appendChild(gnode.domElements.replyContainer)
 }
 
 function replyBlaster(i, gnode, replyTo) {
@@ -455,48 +495,57 @@ function replyBlaster(i, gnode, replyTo) {
     // actually insert these reply info into div which should hold them. it might be a dummy that isnt on screen yet. thats ok.
     let replyContainer = gnReplyParents[replyTo].domElements.replyContainer //if we're in here the gnReplyParent, either real target or a temp dummy one, must already exist.
     let existingChildren = replyContainer.childNodes
+    let nodeToInsert = gnode.domElements.container
     if (i == replyContainer.childNodes.length) {
         console.log(`replyBlaster append at end`)
-        replyContainer.appendChild(gnode.domElements.container);
+        replyContainer.appendChild(nodeToInsert);
     } else {
         //new one becomes the new element i of the children ... meaning add it before existing element i
         console.log(`replyBlaster become elem ${i}`)
         let siblingOfNew = existingChildren[i]
         let siblingParent = siblingOfNew.parentNode
-        siblingParent.insertBefore(gnode.domElements.container, siblingOfNew);
+        siblingParent.insertBefore(nodeToInsert, siblingOfNew);
     }
+    setTimeout(function(xnodeToInsert) { return function() {
+        xnodeToInsert.classList.remove("collapsed")
+        xnodeToInsert.classList.add("expanded")
+    }}(nodeToInsert), 100)
+
 }
 
 function domBlaster(i, gnode) {
     console.log("blast ...", gnode)
     console.log(`blast ${gnode.PreviewText} at ${i}`)
     // return
-    let timelineEl = document.getElementById("timeline")
 
-    // let entryContainer = document.createElement("div")
-    // entryContainer.title = makeGnodeTitle(gnode)
-    // let gnodeDomElements = {
-    //     container: entryContainer,
-    // }
-    // addPostPTag(gnode, gnodeDomElements)
-    // addRePostPTag(gnode, gnodeDomElements)
-    // addFollowsTag(gnode, gnodeDomElements)
-    // // addRepostTag(gnode, gnodeDomElements)
-    //
-    // // let ptag = makePTag(gnode)
-    // // gnode.ptag = ptag
-    // gnode.domElements = gnodeDomElements
+    // let timelineEl = document.getElementById("timeline")
+    let nodeToInsert = gnode.domElements.container
+
+    let timelineEl = document.getElementById("tlcontainer")
+    // let tlEntryTemplate = document.getElementById("telentry_template").querySelector("div")
+    // let nodeToInsert = tlEntryTemplate.cloneNode(true)
 
     let existingChildren = timelineEl.childNodes
     if (i == timelineEl.childNodes.length) {
-        timelineEl.appendChild(gnode.domElements.container);
+        timelineEl.appendChild(nodeToInsert);
     } else {
         //new one becomes the new element i of the children ... meaning add it before existing element i
         console.log(`blast into list and become elem ${i}`)
         let siblingOfNew = existingChildren[i]
+        if (!siblingOfNew) {
+            //debuggin since this shouldnt happen lol.
+            console.log("NO SIBLING??")
+        }
         let siblingParent = siblingOfNew.parentNode
-        siblingParent.insertBefore(gnode.domElements.container, siblingOfNew);
+        siblingParent.insertBefore(nodeToInsert, siblingOfNew);
     }
+    //wasnt seeing the transition by just adding the class here. seems to work with a little timeout. dunno why this is a thing.
+    // let wrapped =
+    setTimeout(function(xnodeToInsert) { return function() {
+        xnodeToInsert.classList.remove("collapsed")
+        xnodeToInsert.classList.add("expanded")
+    }}(nodeToInsert), 100)
+
 }
 
 function makeGnodeTitle(gnode) {
@@ -523,23 +572,35 @@ function addFollowsTag(gnode, gnodeDomElements) {
         return
     }
 
-    let dispName = (gnode.profile && gnode.profile.DisplayName) ? gnode.profile.DisplayName : "[NODATA]"
+    let dispName = profileNametag(gnode.profile)
     if (gnode["publicfollow"]) {
         gnodeDomElements["follows"] = {}
+
         let followsDiv = document.createElement("div")
         for (var j = 0; j < gnode["publicfollow"].length; j++) {
             let followedProfileId = gnode["publicfollow"][j]
             // let followText = cheesyDate(gnode.jsDate) + " " + dispName + ": Follow of " + followedProfileId
-            let followText = dispName + ": Follow of " + followedProfileId
+            // continue
+
+            // let followText = dispName + ": Follow of " + followedProfileId
+            let followText = `${dispName} - Follow of ${followedProfileId}`
             let textnode = document.createTextNode(followText);
+
+
+
             let ptag = document.createElement("p");
-            ptag.appendChild(gnodeDomElements.tsTextnode)
+            ptag.style.margin = "0px"
+            // ptag.appendChild(gnodeDomElements.tsTextnode)
             ptag.appendChild(textnode);
             followsDiv.appendChild(ptag)
             gnodeDomElements["follows"][followedProfileId] = ptag
         }
         gnodeDomElements["followsDiv"] = followsDiv
-        gnodeDomElements.container.appendChild(followsDiv)
+        // gnodeDomElements.container.appendChild(followsDiv)
+
+        let stdPostContentDiv = gnodeDomElements.container.querySelector(".stdpostcontent")
+        stdPostContentDiv.appendChild(followsDiv)
+
     }
 }
 
@@ -547,68 +608,93 @@ function addPostPTag(gnode, gnodeDomElements) {
     if (!gnode["post"] && !gnode["repost"]) {
         return null
     }
-    var ptag = document.createElement("p");
-    ptag.appendChild(gnodeDomElements.tsTextnode);
+    // var ptag = document.createElement("p");
+    // ptag.appendChild(gnodeDomElements.tsTextnode);
 
-    let postPreviewTextnode
-    if (gnode.post) {
-        postPreviewTextnode = document.createTextNode(getNodePreviewText(gnode));
-    } else {
-        //a repost without a post attached needs a bit of help to be displayed in the expected way
-        postPreviewTextnode = document.createTextNode(getNoPostPreviewText(gnode));
-    }
+    let postPreviewTextnode = document.createTextNode(getNodePreviewText(gnode));
+    // if (gnode.post) {
+    //     // postPreviewTextnode = document.createTextNode(getNodePreviewText(gnode));
+    //     postPreviewTextnode = document.createTextNode(getNodePreviewText(gnode));
+    // } else {
+    //     //a repost without a post attached needs a bit of help to be displayed in the expected way
+    //     postPreviewTextnode = document.createTextNode(getNoPostPreviewText(gnode));
+    // }
 
-    gnodeDomElements.postPtag = ptag
+    let posterInfoTextnode = document.createTextNode(getNodePosterInfoText(gnode));
+
+    // gnodeDomElements.postPtag = ptag
+    gnodeDomElements.posterInfoTextnode = posterInfoTextnode
     gnodeDomElements.postTextNode = postPreviewTextnode
+    let buttonArea = gnodeDomElements.container.querySelector(".buttonarea")
+    // buttonArea = document.createElement("div");
+    // <!-- follow: &#x1f465; reply: &#x1f5e8; repost: &#x1f504; unfollow: &#x274c; retract: &#x1f5d1; -->
 
-    if (gnode.ProfileId != selectedIdentityProfileId) {
-        gnodeDomElements.unfollowButton = makeATag("U", function (profileId) {
-            return function () {
-                unfollow(profileId)
-                focusPostText()
-                return false;
-            }
-        }(gnode.ProfileId))
-        ptag.appendChild(gnodeDomElements.unfollowButton);
-        ptag.appendChild(document.createTextNode(" "))
-    }
 
-    gnodeDomElements.replyButton = makeATag("R", function (cid) {
+    gnodeDomElements.replyButton = makeATag("&#x1f5e8;", function (cid) {
         return function () {
             document.getElementById("inreplyto").value = cid
             focusPostText()
             return false;
         }
-    }(gnode.Cid))
-    ptag.appendChild(gnodeDomElements.replyButton);
-    ptag.appendChild(document.createTextNode(" "))
+    }(gnode.Cid), true)
+    // stupidshit = gnodeDomElements.replyButton
+    buttonArea.appendChild(gnodeDomElements.replyButton);
+    // ptag.appendChild(document.createTextNode(" "))
 
     let rpCid = gnode.repost ? gnode.repost : gnode.Cid
-    gnodeDomElements.repostButton = makeATag("RP", function (cid) {
+    gnodeDomElements.repostButton = makeATag("&#x1f504;", function (cid) {
         return function () {
             document.getElementById("repostofnodecid").value = cid
             focusPostText()
             return false;
         }
-    }(rpCid))
-    ptag.appendChild(gnodeDomElements.repostButton);
-    ptag.appendChild(document.createTextNode(" "))
+    }(rpCid), true)
+    // ptag.appendChild(gnodeDomElements.repostButton);
+    // ptag.appendChild(document.createTextNode(" "))
+    buttonArea.appendChild(gnodeDomElements.repostButton);
 
     if (gnode.ProfileId == selectedIdentityProfileId) {
         //offer a disavowal/retraction (but its not a delete, because that is nonsensical in terms of a blockchain.) for things we posted
-        gnodeDomElements.retractButton = makeATag("D", function (cid) {
+        gnodeDomElements.retractButton = makeATag("&#x1f5d1;", function (cid) {
             return function () {
                 retract(cid)
                 focusPostText()
                 return false;
             }
-        }(gnode.Cid))
-        ptag.appendChild(gnodeDomElements.retractButton);
-        ptag.appendChild(document.createTextNode(" "))
+        }(gnode.Cid), true)
+        // ptag.appendChild(gnodeDomElements.retractButton);
+        // ptag.appendChild(document.createTextNode(" "))
+        buttonArea.appendChild(gnodeDomElements.retractButton);
+    } else {
+    // if (gnode.ProfileId != selectedIdentityProfileId) {
+        gnodeDomElements.unfollowButton = makeATag("&#x1F97E;", function (profileId) {
+            return function () {
+                unfollow(profileId)
+                focusPostText()
+                return false;
+            }
+        }(gnode.ProfileId), true)
+        // ptag.appendChild(gnodeDomElements.unfollowButton);
+        // ptag.appendChild(document.createTextNode(" "))
     }
 
-    ptag.appendChild(postPreviewTextnode);
-    gnodeDomElements.container.appendChild(ptag)
+    // ptag.appendChild(postPreviewTextnode);
+
+    if (gnode.post) {
+
+        let stdPostInfoDiv = gnodeDomElements.container.querySelector(".stdpostinfo")
+        stdPostInfoDiv.appendChild(posterInfoTextnode)
+        stdPostInfoDiv.appendChild(document.createTextNode(" - "))
+        stdPostInfoDiv.appendChild(gnodeDomElements.tsTextnode)
+        if (gnodeDomElements.unfollowButton) {
+            stdPostInfoDiv.appendChild(gnodeDomElements.unfollowButton)
+        }
+
+        let stdPostContentDiv = gnodeDomElements.container.querySelector(".stdpostcontent")
+        stdPostContentDiv.appendChild(postPreviewTextnode)
+    }
+
+    // gnodeDomElements.container.appendChild(ptag)
 }
 
 function addRePostPTag(gnode, gnodeDomElements) {
@@ -629,11 +715,48 @@ function addRePostPTag(gnode, gnodeDomElements) {
     //     return false;
     // }}(gnode.reposteeProfile.Id))
 
-    let followButtonPlaceholder = makeATag("F", function(){
+    let followButtonPlaceholder = makeATag("&#x1f465;", function(){
         return false
-    })
+    }, true)
     gnodeDomElements.repostFollowButton = followButtonPlaceholder
     gnodeDomElements.repostTextNode = previewTextnode
+    gnodeDomElements.reposteeInfoTextNode = document.createTextNode(getReposteeInfoText(gnode));
+
+    if (!gnode["post"]) {
+        let repostNoteDiv = gnodeDomElements.container.querySelector(".repostnotespan")
+        repostNoteDiv.style.removeProperty("height")
+
+        let reposterSmallIcon =  repostNoteDiv.querySelector(".smallicon")
+        reposterSmallIcon.setAttribute("data-jdenticon-value", gnode.ProfileId)
+        reposterSmallIcon.style.display = ""
+        jdenticon.update(reposterSmallIcon)
+        let reposterInfoP = gnodeDomElements.container.querySelector(".reposterinfo")
+        // reposterInfoP.
+        // let reposterSmallIcon = document.createElement("svg")
+        // reposterSmallIcon.style.width = "20px"
+        // reposterSmallIcon.style.height = "20px"
+        // repostNoteDiv.appendChild(reposterSmallIcon)
+
+        reposterInfoP.appendChild(gnodeDomElements.posterInfoTextnode)
+        reposterInfoP.appendChild(document.createTextNode(" reposted - "))
+        reposterInfoP.appendChild(gnodeDomElements.tsTextnode)
+        if (gnodeDomElements.unfollowButton) {
+            reposterInfoP.appendChild(gnodeDomElements.unfollowButton)
+        }
+    }
+
+    let rePostContentDiv = gnodeDomElements.container.querySelector(".repostcontainer")
+    rePostContentDiv.querySelector(".reposteeinfo").appendChild(gnodeDomElements.reposteeInfoTextNode)
+    // rePostContentDiv.querySelector(".reposteeinfo").appendChild(document.createTextNode("WTFFFFFFFF"))
+    rePostContentDiv.querySelector(".reposteeinfo").appendChild(gnodeDomElements.repostFollowButton)
+
+    // let TEMPofuck =
+    rePostContentDiv.querySelector(".repostpreview").appendChild(gnodeDomElements.repostTextNode)
+    rePostContentDiv.style.display = ""
+
+    let smallicon = rePostContentDiv.querySelector(".smallicon")
+    smallicon.classList.add("collapsed")
+    // jdenticon.update(smallicon)
 
     // let appendee
     // if (gnode["post"]) {
@@ -655,9 +778,9 @@ function addRePostPTag(gnode, gnodeDomElements) {
     // }
 
 
-    gnodeDomElements.postPtag.appendChild(labelTextnode);
-    gnodeDomElements.postPtag.appendChild(followButtonPlaceholder);
-    gnodeDomElements.postPtag.appendChild(previewTextnode);
+    // gnodeDomElements.postPtag.appendChild(labelTextnode);
+    // gnodeDomElements.postPtag.appendChild(followButtonPlaceholder);
+    // gnodeDomElements.postPtag.appendChild(previewTextnode);
 
     //     //go in with existing ptag
     //     gnodeDomElements.postPtag.appendChild(followButtonPlaceholder)
@@ -671,20 +794,39 @@ function addRePostPTag(gnode, gnodeDomElements) {
 }
 
 function updateTimelinePost(gnode) {
-    if (!gnode.post || !gnode.domElements || !gnode.domElements.postPtag || !gnode.domElements.postTextNode) {
+    if (!gnode.post || !gnode.domElements || !gnode.domElements.postTextNode || !gnode.domElements.posterInfoTextnode) {
         return
     }
     console.log("updateTimelinePost: here1")
     gnode.domElements.postTextNode.textContent = getNodePreviewText(gnode)
+    gnode.domElements.posterInfoTextnode.textContent = getNodePosterInfoText(gnode)
 }
 function updateTimelineRepost(gnode) {
     // if (!gnode.domElements || !gnode.domElements.repostTextNode) {
     if (!gnode.domElements || !gnode.domElements.repostTextNode || !gnode.reposteeProfile) {
         return
     }
+    // return
     console.log("updateTimelineRepost: here1")
-    let textNode = gnode.domElements.repostTextNode
-    textNode.textContent = getRepostPreviewText(gnode)
+    gnode.domElements.repostTextNode.textContent = getRepostPreviewText(gnode)
+    gnode.domElements.reposteeInfoTextNode.textContent = getReposteeInfoText(gnode)
+
+
+    let rePostContentDiv = gnode.domElements.container.querySelector(".repostcontainer")
+    let smallicon = rePostContentDiv.querySelector(".smallicon")
+
+    if (!gnode.post) {
+        let bigicon = gnode.domElements.container.querySelector(".bigicon")
+        bigicon.setAttribute("data-jdenticon-value", gnode.reposteeProfile.Id)
+        jdenticon.update(bigicon)
+        smallicon.style.display = "none"
+    } else {
+        smallicon.setAttribute("data-jdenticon-value", gnode.reposteeProfile.Id)
+        jdenticon.update(smallicon)
+        smallicon.style.display = ""
+    }
+
+
     if (gnode.reposteeProfile.Id == selectedIdentityProfileId || follows[gnode.reposteeProfile.Id]) {
         //if this is us or one of our followers reposting our own thing, we dont need a follow button.
         //or a repost of someone we already follow, dont need it either.
@@ -708,13 +850,16 @@ function updateTlFolloweeInfo(gnode) {
         return
     }
     console.log("updateTlFolloweeInfo ...")
-    let dispName = (gnode.profile && gnode.profile.DisplayName) ? gnode.profile.DisplayName : "[NODATA]"
+
+    let dispName = (gnode.profile && gnode.profile.DisplayName) ? profileNametag(gnode.profile) : "[NODATA]"
     for (let followeeProfileCid of Object.keys(gnode.followeeProfileInfo)) {
         let pTagtoUpdate = gnode.domElements.follows[followeeProfileCid]
-        let textNode = pTagtoUpdate.childNodes[1] //0 = the ts textnode, 1 = the follow display textnode
-        let followeeDispName = gnode.followeeProfileInfo[followeeProfileCid].DisplayName || "[UNOBTAINABLE]"
-        textNode.textContent = dispName + ": Follow of " + followeeDispName
+        let textNode = pTagtoUpdate.childNodes[0] //0 = the ts textnode, 1 = the follow display textnode
+        let follweeProfile = gnode.followeeProfileInfo[followeeProfileCid]
+        let followeeDispName = (follweeProfile.Id && follweeProfile.DisplayName) ? profileNametag(follweeProfile) : "[UNOBTAINABLE]"
+        textNode.textContent = `${dispName} - Follow of ${followeeDispName}`
     }
+
 }
 // function updateTlFolloweeInfo(gnode) {
 //     console.log("updateTlFolloweeInfo ...")
@@ -727,23 +872,41 @@ function updateTlFolloweeInfo(gnode) {
 //     }
 // }
 function getRepostPreviewText(gnode) {
-    let indent = gnode["Indent"] ? gnode["Indent"] : 0
-    // let dispName = (gnode.profile && gnode.profile.DisplayName) ? gnode.profile.DisplayName : "[NODATA]"
-    let dispName = gnode.reposteeProfile ? gnode.reposteeProfile.DisplayName :  "[NAME-TBD]"
+    // let indent = gnode["Indent"] ? gnode["Indent"] : 0
+    // // let dispName = (gnode.profile && gnode.profile.DisplayName) ? gnode.profile.DisplayName : "[NODATA]"
+    // let dispName = gnode.reposteeProfile ? gnode.reposteeProfile.DisplayName :  "[NAME-TBD]"
+    // let ts = ""
+    // if (gnode.repostGn) {
+    //     ts = cheesyDate(new Date(gnode.repostGn.post.Date)) + " "
+    // }
+
+    return gnode["RepostPreviewText"] ? gnode["RepostPreviewText"] : gnode["repost"]
+    // return " " + ts + dispName + ": " + previewText + "  "
+}
+function getReposteeInfoText(gnode) {
     let ts = ""
     if (gnode.repostGn) {
         ts = cheesyDate(new Date(gnode.repostGn.post.Date)) + " "
     }
-
-    let previewText = gnode["RepostPreviewText"] ? gnode["RepostPreviewText"] : gnode["repost"]
-    return " " + ts + dispName + ": " + previewText + "  "
+    return gnode.reposteeProfile ? profileNametag(gnode.reposteeProfile) + ` - ${ts}`:  "[NAME-TBD]"
 }
 
 function getNodePreviewText(gnode) {
-    let indent = gnode["Indent"] ? gnode["Indent"] : 0
-    let dispName = (gnode.profile && gnode.profile.DisplayName) ? gnode.profile.DisplayName : "[NODATA]"
-    let previewText = gnode["PreviewText"] ? gnode["PreviewText"] : gnode["Cid"]
-    return " " + "\u00A0".repeat(indent * 8) + " " + dispName + ": " + previewText + "  "
+    // let indent = gnode["Indent"] ? gnode["Indent"] : 0
+    // let dispName = (gnode.profile && gnode.profile.DisplayName) ? gnode.profile.DisplayName : "[NODATA]"
+    return gnode["PreviewText"] ? gnode["PreviewText"] : gnode["Cid"]
+    // return " " + "\u00A0".repeat(indent * 8) + " " + dispName + ": " + previewText + "  "
+}
+function getNodePosterInfoText(gnode) {
+    if (gnode.profile && gnode.profile.DisplayName) {
+        return profileNametag(gnode.profile)
+    }
+    return "[NODATA]"
+}
+function profileNametag(profileData) {
+    let ProfileId = profileData.Id
+    let shortinfo = ProfileId.substring(ProfileId.length - 5)
+    return `@${profileData.DisplayName} (${shortinfo})`
 }
 
 function getNoPostPreviewText(gnode) {
@@ -917,11 +1080,15 @@ function displayTimelineTextsFromServer(textsJson) {
     }
 }
 
-function makeATag(text, onclick) {
+function makeATag(text, onclick, nobrackets) {
     var atag = document.createElement("a");
     atag.href = "#"
     atag.onclick = onclick
-    atag.appendChild(document.createTextNode("[" + text +  "]"))
+    if (nobrackets) {
+        atag.innerHTML = text
+    } else {
+        atag.innerHTML = "[" + text +  "]"
+    }
     return atag
 }
 
@@ -1026,7 +1193,33 @@ function setEnterButtonAction(){
     }
 }
 
+function menuswap() {
+    let menuHidden = document.getElementById("menuthing").style.display == "none" ? true : false
+    if (menuHidden) {
+        // document.getElementById("mainthing").style.display="none"
+        document.getElementById("mainuipane").style.display="none"
+        document.getElementById("menuthing").style.display=""
+    } else {
+        document.getElementById("menuthing").style.display="none"
+        // document.getElementById("mainthing").style.display=""
+        document.getElementById("mainuipane").style.display=""
+    }
+}
+
+function toggle(thing) {
+    thing = document.getElementById(`entry${thing}`)
+    if (thing.classList.contains("expanded")) {
+        thing.classList.remove("expanded")
+    } else {
+        thing.classList.add("expanded")
+    }
+}
+
 myOnload = async function() {
+    // console.log("DEBUGGGGGGGG do naaathin")
+    // return
+    tlEntryTemplate = document.getElementById("telentry_template").querySelector("div")
+
     await startIpfs()
     await reloadSession()
     setEnterButtonAction()

@@ -295,6 +295,7 @@ func (tl *Timeline) LoadHistory() error {
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(deduped))
+	inteterestedCidMu := sync.Mutex{}
 
 	for idx, followeeProfileId := range deduped {
 		go func(followeeProfileId string, idx int) {
@@ -312,7 +313,9 @@ func (tl *Timeline) LoadHistory() error {
 			}
 			for _, tlGraphNode := range followeeGraphNodeHistory {
 				if tlGraphNode.Post == nil && tlGraphNode.RepostOfNodeCid == nil{ continue }
+				inteterestedCidMu.Lock()
 				interestedCidNodes[tlGraphNode.cid] = tlGraphNode
+				inteterestedCidMu.Unlock()
 			}
 			queue <- tlFolloweeWithHistory{
 				profileId: followeeProfileId,

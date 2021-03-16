@@ -66,6 +66,9 @@ func (s *APIService) getHttpHandler() http.Handler {
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, filePath+"/index.html")
 	})
+	router.HandleFunc("/experiment.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, filePath+"/experiment.html")
+	})
 	router.PathPrefix("/lib").Handler(http.StripPrefix("/lib", http.FileServer(http.Dir(filePath+"/lib"))))
 
 	authedRouter := router.PathPrefix("/service").Subrouter()
@@ -247,7 +250,6 @@ func (s *APIService) WlProfileIdViaPubkeyHeaderAuthMiddleware(next http.Handler)
 			return
 		}
 
-		log.Printf("middleware debug: %#v", r.URL)
 		profileId, onWl := s.checkHeaderForPubkeyOnWl(r.Header.Get("X-Pubkey-B64"))
 		if !onWl {
 			log.Printf("FORBIDDEN Profileid '%s' not on wl.", profileId)

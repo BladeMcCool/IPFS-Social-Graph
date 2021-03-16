@@ -4,6 +4,7 @@ let multihistory = {}
 // const binaryInsert = require('binary-insert').binaryInsert
 
 async function loadJsTimeline() {
+    // alert("...")
     asyncPool = require("tiny-async-pool")
     if (!ipfsStarted) {
         await startIpfs()
@@ -57,7 +58,7 @@ async function updateJsTimeline() {
     fetchGraphNodeHistory(profileData, true, multihistory, true).catch(e => console.log(`updateJsTimeline fetchGraphNodeHistory err while collecting for ${profileData.Id}: `, e))
 
     //but we arent going to end up going and redoing our followees under normal circumstances. so lets do those
-    for (let followeeProfileId in followeeProfiles) {
+    for (let followeeProfileId in follows) {
         getFolloweeProfileInfo(followeeProfileId).then(followeeProfileInfo => {
             fetchGraphNodeHistory(followeeProfileInfo, false, multihistory, true).catch(e => console.log(`updateJsTimeline fetchGraphNodeHistory err while collecting for followee ${profileData.Id}: `, e))
         }).catch(e => console.log(`updateJsTimeline getFolloweeProfileInfo err while collecting for ${profileData.Id}: `, e))

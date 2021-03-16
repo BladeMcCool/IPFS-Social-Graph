@@ -73,6 +73,11 @@ async function setIdentity(keyname) {
     document.getElementById("inreplyto").value = ""
     focusPostText()
 
+    let mysmallIconSvg = document.getElementById("profilename").childNodes[0]
+    mysmallIconSvg.setAttribute("data-jdenticon-value", identity["profileid"] ? identity["profileid"] : "")
+    jdenticon.update(mysmallIconSvg)
+    document.getElementById("profilename").childNodes[1].textContent = profileNametag({Id:identity["profileid"] ? identity["profileid"] : "", DisplayName: identity["dispname"] ? identity["dispname"] : ""})
+
     try {
         await localforage.setItem('selectedIdentity', keyname);
         console.log("updated selectedIdentity indexeddb");
