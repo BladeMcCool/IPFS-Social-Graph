@@ -7,6 +7,7 @@
   <script src="./lib/stablejson.bundle.js"></script>
   <script src="./lib/binary-insert.js"></script>
   <script src="./lib/jdenticon.min.js"></script>
+  <script src="./lib/moment.min.js"></script>
   <script src="./lib/pool.js"></script>
   <script src="./lib/ui.js"></script>
   <script src="./lib/server.js"></script>
@@ -18,6 +19,7 @@
     .wrapper {
       display: grid;
       grid-template-columns: 50px auto;
+      /*grid-template-columns: 50px minmax(0, 1fr);*/
       /*grid-template-rows: 50px;*/
     }
     div.wrapper  { border: 0px solid black; }
@@ -30,13 +32,14 @@
     .tlentry {
       /*border: 10px solid black;*/
       display: grid;
-      grid-template-columns: 50px auto;
+      /*grid-template-columns: 50px auto;*/
+      grid-template-columns: 50px minmax(0, 1fr);
       /*grid-template-rows: 100px auto;*/
       margin-bottom: 0px;
       padding-bottom: 0px;
       /*grid-template-rows: 10% 80% 10%;*/
     }
-    #rightpane { padding-left: 10px; }
+    #rightpane { padding-left: 7px;  }
     .tlentry .tallboy {
       grid-row-start: 2;
       grid-row-end: 7;
@@ -55,6 +58,7 @@
     /*}*/
     .composearea {
       display: grid;
+      /*grid-template-columns: minmax(0, 1fr) 50px;*/
       grid-template-columns: auto 50px;
       grid-template-rows: 20px auto;
     }
@@ -73,10 +77,16 @@
     }
     .repostcontainer {
       border-radius: 3px;
-      margin-right: 10px;
+      margin-right: 7px;
     }
 
-    div.tlentry { margin-right: 10px; }
+    /*.mainuipane {*/
+    /*  display: grid;*/
+    /*  grid-template-rows: auto auto;*/
+    /*}*/
+    /*.mainuipane { border: 10px solid orange }*/
+
+    div.tlentry { margin-right: 7px; }
     /*.tlentry  div { border: 0px solid green; }*/
     .tlentry svg.bigicon { width: 50px; height: 50px; }
     svg.smallicon { vertical-align: middle; display: inline-block; width:20px; height: 20px; border: 0px solid black; margin: auto; }
@@ -118,7 +128,7 @@
     }
     .expanded {
       transition: all .5s ease-in-out;
-      margin-bottom: 10px;
+      margin-bottom: 7px;
       border: 1px solid lightseagreen;
       border-radius: 5px;
       line-height: 1.1;
@@ -165,7 +175,7 @@
     <div class="hamburgers" onclick="menuswap()" style="text-align: center; cursor:pointer;"><p>&#x2630;</p></div>
     <div id="rightpane">
 
-      <div id="mainuipane">
+      <div id="mainuipane" class="mainuipane">
         <div id="mainthing" class="composearea">
           <div class="profilename"><p id="profilename"><svg class="smallicon"></svg> </p></div>
           <div style="padding: 4px 4px 10px 0px;"><input type="text" id="posttext" name="posttext"></div>
@@ -248,8 +258,10 @@
       <div class="tlentry collapsed">
         <div class="repostnotespan" style="height: 0px">
           <div style="vertical-align: top;">
-            <svg class="smallicon" style="display: none"></svg>
-            <p class="reposterinfo" style="vertical-align: middle; display: inline-block; border: 0px solid black; margin: 0px;"></p>
+            <span style="white-space: nowrap">
+              <svg class="smallicon" style="display: none"></svg><p class="reposterinfo" style="vertical-align: middle; display: inline-block; border: 0px solid black; margin: 0px;"></p>
+            </span>
+            <p class="reposterts" style="vertical-align: middle; display: inline-block; border: 0px solid black; margin: 0px;"></p>
           </div>
         </div>
         <div class="tallboy"><svg class="bigicon"></svg></div>
@@ -257,8 +269,10 @@
         <div class="stdpostcontent"></div>
         <div class="repostcontainer" style="display: none">
           <div style="vertical-align: top;">
-            <svg class="smallicon" style="display: none"></svg>
-            <p class="reposteeinfo" style="vertical-align: middle; display: inline-block; border: 0px solid black; margin: 0px;"></p>
+            <span style="white-space: nowrap">
+              <svg class="smallicon" style="display: none"></svg><p class="reposteeinfo" style="vertical-align: middle; display: inline-block; border: 0px solid black; margin: 0px;"></p>
+            </span>
+            <p class="reposteets" style="vertical-align: middle; display: inline-block; border: 0px solid black; margin: 0px;"></p>
             <p class="repostpreview" style="border: 0px solid black; margin: 0px;"></p>
           </div>
         </div>

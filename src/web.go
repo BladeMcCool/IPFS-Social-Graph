@@ -41,7 +41,21 @@ func (s *APIService) Start() {
 		s.StartTLSServer()
 	} else {
 		log.Printf("one or more of TLSHostName and TLSDataDir are not set, not setting up for TLS Server")
-		err := http.ListenAndServe(":"+s.ListenPort, s.getHttpHandler())
+
+		//http.HandleFunc("/hello", HelloServer)
+
+		// dont have certs??
+		// do this: (thanks https://gist.github.com/denji/12b3a568f092ab951456)
+		// openssl ecparam -genkey -name secp384r1 -out server.key
+		// openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650
+		handler := s.getHttpHandler(false)
+		go func() {
+			err := http.ListenAndServeTLS(":4443", "server.crt", "server.key", handler)
+			if err != nil {
+				log.Fatal("ListenAndServeTLS: ", err)
+			}
+		}()
+		err := http.ListenAndServe(":"+s.ListenPort, handler)
 		if err != nil {
 			panic(err)
 		}
@@ -49,7 +63,7 @@ func (s *APIService) Start() {
 
 }
 
-func (s *APIService) getHttpHandler() http.Handler {
+func (s *APIService) getHttpHandler(useauthMiddleware bool) http.Handler {
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, // All origins
@@ -73,7 +87,9 @@ func (s *APIService) getHttpHandler() http.Handler {
 
 	authedRouter := router.PathPrefix("/service").Subrouter()
 	// some middleware to auth by pubkey
-	authedRouter.Use(s.WlProfileIdViaPubkeyHeaderAuthMiddleware)
+	if useauthMiddleware {
+		authedRouter.Use(s.WlProfileIdViaPubkeyHeaderAuthMiddleware)
+	}
 	authedRouter.HandleFunc("/unsignedGraphNodeForPost", s.unsignedGraphNodeForPost).Methods("POST")
 	authedRouter.HandleFunc("/unsignedProfileWithFirstPost", s.unsignedProfileWithFirstPost).Methods("POST")
 	authedRouter.HandleFunc("/publishedProfileCid", s.publishedProfileCid).Methods("POST")
@@ -110,7 +126,7 @@ func (s *APIService) StartTLSServer() {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  120 * time.Second,
-		Handler:      s.getHttpHandler(),
+		Handler:      s.getHttpHandler(true),
 	}
 	//httpsSrv = makeHTTPServer()
 	m := &autocert.Manager{

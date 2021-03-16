@@ -564,6 +564,9 @@ function makeGnodeTitle(gnode) {
             title += "\nFollow of ProfileId: " + gnode["publicfollow"][j]
         }
     }
+    // console.log(gnode)
+    // console.log(gnode.jsDate)
+    // title += `\nDate: ${gnode.jsDate.toISOString().split('.')[0]+"Z"}`
     return title
 }
 
@@ -667,7 +670,7 @@ function addPostPTag(gnode, gnodeDomElements) {
         buttonArea.appendChild(gnodeDomElements.retractButton);
     } else {
     // if (gnode.ProfileId != selectedIdentityProfileId) {
-        gnodeDomElements.unfollowButton = makeATag("&#x1F97E;", function (profileId) {
+        gnodeDomElements.unfollowButton = makeATag("&#x2718;", function (profileId) {
             return function () {
                 unfollow(profileId)
                 focusPostText()
@@ -715,13 +718,6 @@ function addRePostPTag(gnode, gnodeDomElements) {
     //     return false;
     // }}(gnode.reposteeProfile.Id))
 
-    let followButtonPlaceholder = makeATag("&#x1f465;", function(){
-        return false
-    }, true)
-    gnodeDomElements.repostFollowButton = followButtonPlaceholder
-    gnodeDomElements.repostTextNode = previewTextnode
-    gnodeDomElements.reposteeInfoTextNode = document.createTextNode(getReposteeInfoText(gnode));
-
     if (!gnode["post"]) {
         let repostNoteDiv = gnodeDomElements.container.querySelector(".repostnotespan")
         repostNoteDiv.style.removeProperty("height")
@@ -738,17 +734,31 @@ function addRePostPTag(gnode, gnodeDomElements) {
         // repostNoteDiv.appendChild(reposterSmallIcon)
 
         reposterInfoP.appendChild(gnodeDomElements.posterInfoTextnode)
-        reposterInfoP.appendChild(document.createTextNode(" reposted - "))
-        reposterInfoP.appendChild(gnodeDomElements.tsTextnode)
+        let reposterTsP = gnodeDomElements.container.querySelector(".reposterts")
+
+        reposterTsP.appendChild(document.createTextNode(" reposted - "))
+        reposterTsP.appendChild(gnodeDomElements.tsTextnode)
         if (gnodeDomElements.unfollowButton) {
-            reposterInfoP.appendChild(gnodeDomElements.unfollowButton)
+            reposterTsP.appendChild(gnodeDomElements.unfollowButton)
         }
     }
 
+    let followButtonPlaceholder = makeATag("&#x1f465;", function(){
+        return false
+    }, true)
+    gnodeDomElements.repostFollowButton = followButtonPlaceholder
+    gnodeDomElements.repostTextNode = previewTextnode
+    gnodeDomElements.reposteeInfoTextNode = document.createTextNode(getReposteeInfoText(gnode));
+    gnodeDomElements.reposteeInfoTs = document.createTextNode(getReposteeTsText(gnode))
+
     let rePostContentDiv = gnodeDomElements.container.querySelector(".repostcontainer")
-    rePostContentDiv.querySelector(".reposteeinfo").appendChild(gnodeDomElements.reposteeInfoTextNode)
+    let reposteeInfoP = rePostContentDiv.querySelector(".reposteeinfo")
+    reposteeInfoP.appendChild(gnodeDomElements.reposteeInfoTextNode)
     // rePostContentDiv.querySelector(".reposteeinfo").appendChild(document.createTextNode("WTFFFFFFFF"))
-    rePostContentDiv.querySelector(".reposteeinfo").appendChild(gnodeDomElements.repostFollowButton)
+    reposteeInfoP.appendChild(gnodeDomElements.repostFollowButton)
+
+    let reposteeTsP = rePostContentDiv.querySelector(".reposteets")
+    reposteeTsP.appendChild(gnodeDomElements.reposteeInfoTs)
 
     // let TEMPofuck =
     rePostContentDiv.querySelector(".repostpreview").appendChild(gnodeDomElements.repostTextNode)
@@ -810,6 +820,7 @@ function updateTimelineRepost(gnode) {
     console.log("updateTimelineRepost: here1")
     gnode.domElements.repostTextNode.textContent = getRepostPreviewText(gnode)
     gnode.domElements.reposteeInfoTextNode.textContent = getReposteeInfoText(gnode)
+    gnode.domElements.reposteeInfoTs.textContent = getReposteeTsText(gnode)
 
 
     let rePostContentDiv = gnode.domElements.container.querySelector(".repostcontainer")
@@ -884,11 +895,14 @@ function getRepostPreviewText(gnode) {
     // return " " + ts + dispName + ": " + previewText + "  "
 }
 function getReposteeInfoText(gnode) {
+    return gnode.reposteeProfile ? profileNametag(gnode.reposteeProfile) :  "[NAME-TBD]"
+}
+function getReposteeTsText(gnode) {
     let ts = ""
     if (gnode.repostGn) {
         ts = cheesyDate(new Date(gnode.repostGn.post.Date)) + " "
     }
-    return gnode.reposteeProfile ? profileNametag(gnode.reposteeProfile) + ` - ${ts}`:  "[NAME-TBD]"
+    return ` - ${ts}`
 }
 
 function getNodePreviewText(gnode) {

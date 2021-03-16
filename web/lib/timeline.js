@@ -77,7 +77,8 @@ async function experiment2() {
 }
 
 function cheesyDate(dateobj) {
-    return dateobj.toISOString().split('.')[0]+"Z" //cheesy, but works. i didnt invent it.
+    // return dateobj.toISOString().split('.')[0]+"Z" //cheesy, but works. i didnt invent it.
+    return moment(dateobj).fromNow()
 }
 async function unsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, followprofileid, unfollowprofileid, likeofnodecid, unlikeofnodecid, retractionofnodecid, repostofnodecid) {
 
@@ -442,11 +443,6 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
         }
         currentGn.profile = profile
         currentGn.Cid = currentGnCid
-        if (currentGn.Cid == null) {
-            //get rid of this if the weird issue if missing cid doesnt happen again, likely was being caused by a scoping issue
-            alert("wot") //i think this was a variable scoping issue. havent seen it since fixing those scopes
-            // console.log("how is this possible.")
-        }
         currentGn.Indent = 0 //temp
         currentGn.replies = []
 
