@@ -20,6 +20,8 @@ func main() {
 		TLSHostName:         getTLSHostName(),
 		TLSDataDir: getTLSDataDir(),
 		BaseWlProfileIdList: getWlBaseProfileIdList(),
+		RecaptchaSecretKey: getRecaptchaSecretKey(),
+		RecaptchaSiteKey: getRecaptchaSiteKey(),
 	}
 	initializers()
 	go IPFS.StartIPNSPeriodicUpdater()
@@ -132,6 +134,24 @@ func getTLSDataDir() string {
 	}
 	return ""
 }
+
+func getRecaptchaSecretKey() string {
+	val, ok := os.LookupEnv("RECAPTCHA_SECRETKEY")
+	if ok {
+		return val
+	}
+	return ""
+}
+func getRecaptchaSiteKey() string {
+	val, ok := os.LookupEnv("RECAPTCHA_SITEKEY")
+	if ok {
+		return val
+	}
+	return ""
+}
+
+
+
 
 func checkError(err error) {
 	if err != nil {

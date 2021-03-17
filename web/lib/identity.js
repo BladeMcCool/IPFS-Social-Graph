@@ -116,12 +116,6 @@ async function initIdentity() {
 
 async function newIdentity(newidentname, dispname, bio) {
     console.log('newIdentity: identities is: ', identities);
-    if (!newidentname) {
-        newidentname = getNewIdentName()
-    }
-    if (!newidentname) {
-        return
-    }
 
     keypair = await generateKey()
     console.log("keypair", keypair)
@@ -134,6 +128,16 @@ async function newIdentity(newidentname, dispname, bio) {
     pkcs8b64 = arrayBufferToBase64String(pkcs8)
     console.log("privkey b64 in pkcs8", pkcs8b64)
     profileId = await peerutil.peerid(spkib64)
+
+    if (!await loadRecaptchaScript(profileId)) {
+        return
+    }
+    if (!newidentname) {
+        newidentname = getNewIdentName()
+    }
+    if (!newidentname) {
+        return
+    }
 
     newIdentitySettings = {
         "pub":spkib64,

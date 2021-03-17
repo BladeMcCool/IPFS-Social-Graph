@@ -268,6 +268,47 @@ async function loadServerHistory() {
     displayTimelineTextsFromServer(latestTimelineTextsJson)
 }
 
+let recaptchaSiteKey = ""
+async function loadRecaptchaScript(profileId) {
+    return new Promise(async function(resolve) {
+        // if we didnt set up the server to do this then we wont get much of a key back here and wont do anything.
+        let key = await getRecaptchaSiteKey()
+        if (!key) {
+            resolve(true)
+        }
+        recaptchaSiteKey = key
+        let script = document.createElement('script');
+        script.onload = function () {
+            grecaptcha.ready(async function() {
+                if (profileId) {
+                    return resolve(await performRecaptchaChallenge(profileId))
+                }
+                resolve(null)
+            });
+            //do stuff with the script
+        };
+        script.src = `https://www.google.com/recaptcha/api.js?render=${key}`;
+        document.head.appendChild(script); //or something of the likes
+    })
+}
+
+function performRecaptchaChallenge(profileId) {
+    return new Promise(function(resolve) {
+        grecaptcha.execute(recaptchaSiteKey, {action: 'wlrequest'}).then(async function(token) {
+            // Add your logic to submit to your backend server here.
+            //// HOW TO INTERPREt MY OWN SERVER RESP ??? not sure if i can presently detect failure here.
+            let success = await verifyRecaptchaToken(profileId, token);
+            console.log(`performRecaptchaChallenge, is human according to G? ${success}`)
+            if (success) {
+                resolve(true)
+            } else {
+                resolve(false)
+            }
+            // there is no reject.
+        });
+    })
+}
+
 function unfollow(profileId) {
     //set the field and call the create post func.
     document.getElementById("unfollowprofileid").value = profileId

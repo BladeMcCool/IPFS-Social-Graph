@@ -166,6 +166,22 @@ async function IPNSDelegateName() {
     return result
 }
 
+async function getRecaptchaSiteKey() {
+    return await makeRequest("GET", serviceBaseUrl + "/recaptchaSiteKey")
+}
+async function verifyRecaptchaToken(profileId, token) {
+    try {
+        await makeRequest("POST", serviceBaseUrl + "/verifyRecaptchaToken", {
+            ProfileId: profileId,
+            Token: token
+        })
+        return true
+    } catch(e) {
+        return false
+    }
+}
+
+
 var requestTracker = {}
 function makeRequest(method, url, payload, track) {
     //thank you mister https://jacoby.github.io/js/2018/10/04/field-notes-on-vanilla-javascript-and-asyncawait-with-xhr.html, such convenience.

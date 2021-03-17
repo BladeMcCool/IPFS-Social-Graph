@@ -32,6 +32,8 @@ type APIService struct {
 	BaseWlProfileIdList []string
 	TLSHostName         string
 	TLSDataDir          string
+	RecaptchaSecretKey string
+	RecaptchaSiteKey string
 }
 
 //var WlProfileIds = map[string]bool{}
@@ -77,6 +79,9 @@ func (s *APIService) getHttpHandler(useauthMiddleware bool) http.Handler {
 	if s.FilePathOverride != "" {
 		filePath = s.FilePathOverride
 	}
+
+	router.HandleFunc("/recaptchaSiteKey", s.recaptchaSiteKey).Methods("GET")
+	router.HandleFunc("/verifyRecaptchaToken", s.verifyRecaptchaToken).Methods("POST")
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, filePath+"/index.html")
@@ -297,6 +302,46 @@ func (s *APIService) checkHeaderForPubkeyOnWl(pubkeyB64 string) (string, bool) {
 	log.Printf("checkHeaderForPubkeyOnWl: %s is on the list.", profileId)
 	return profileId, true
 }
+
+func (s *APIService) recaptchaSiteKey(w http.ResponseWriter, r *http.Request) {
+	if s.RecaptchaSiteKey == "" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(s.RecaptchaSiteKey))
+}
+
+
+type VerifyRecaptchaTokenJsonArgs struct {
+	Token     string
+	ProfileId string
+}
+func (s *APIService) verifyRecaptchaToken(w http.ResponseWriter, r *http.Request) {
+	args := &VerifyRecaptchaTokenJsonArgs{}
+	err := json.NewDecoder(r.Body).Decode(&args)
+	_ = err
+	if err != nil || args.ProfileId == "" {
+		log.Println("decode error:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	//log.Printf("%#v", args)
+	err = CheckRecaptcha(s.RecaptchaSecretKey, args.Token)
+	if err != nil {
+		log.Printf("verifyRecaptchaToken ---- FAILED --- : FOR USER OF PROFILE ID %s", args.ProfileId)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	//so, it was good then i guess. let em in.
+	log.Printf("verifyRecaptchaToken PASSED: FOR USER OF PROFILE ID %s", args.ProfileId)
+	s.WlProfileIdMutex.RLock()
+	defer s.WlProfileIdMutex.RUnlock()
+	s.WlProfileIds[args.ProfileId] = true
+	w.WriteHeader(http.StatusNoContent)
+}
+
 
 type CreateProfileJsonArgs struct {
 	Pubkey              string  `json: "pubkey"`
