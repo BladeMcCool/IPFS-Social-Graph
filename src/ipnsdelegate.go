@@ -313,6 +313,15 @@ func (df *IPNSDelegateFederation) Get(profileId string) *string {
 	}
 	return &val
 }
+func (df *IPNSDelegateFederation) GetAllJson() ([]byte, error) {
+	df.mutex.RLock()
+	defer df.mutex.RUnlock()
+	mapJson, err := json.Marshal(df.IPNSDelegatedProfileCids)
+	if err != nil {
+		return nil, err
+	}
+	return mapJson, nil
+}
 func (df *IPNSDelegateFederation) Set(profileId, profileCid string) {
 	df.mutex.Lock()
 	defer df.mutex.Unlock()

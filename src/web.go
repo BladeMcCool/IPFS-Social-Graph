@@ -96,6 +96,8 @@ func (s *APIService) getHttpHandler(useauthMiddleware bool) http.Handler {
 	authedRouter.HandleFunc("/publishedProfileCid", s.publishedProfileCid).Methods("POST")
 	authedRouter.HandleFunc("/updateProfileCid", s.updateProfileCid).Methods("POST")
 	authedRouter.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET", "POST")
+	authedRouter.HandleFunc("/IPNSDelegateNames", s.IPNSDelegateNames).Methods("GET", "POST")
+	authedRouter.HandleFunc("/federationProfiles", s.FederationProfiles).Methods("GET")
 	authedRouter.HandleFunc("/history", s.history).Methods("POST")
 	authedRouter.HandleFunc("/profileBestTip", s.profileBestTip).Methods("POST")
 	authedRouter.HandleFunc("/profileBestTipCid", s.profileBestTipCid).Methods("POST")
@@ -697,6 +699,41 @@ func (s *APIService) IPNSDelegateName(w http.ResponseWriter, _ *http.Request) {
 	}
 	w.Write([]byte(ipfsName))
 }
+func (s *APIService) IPNSDelegateNames(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	memberNames := []string{}
+	for _, memberName := range Federation.memberNames {
+		memberNames = append(memberNames, memberName)
+	}
+	_, ipfsName, err := IPFS.getIPNSDelegateName()
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	memberNames = append(memberNames, ipfsName)
+
+	namesJson, err := json.Marshal(memberNames)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(namesJson)
+}
+
+func (s *APIService) FederationProfiles(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	profilesJson, err := Federation.GetAllJson()
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(profilesJson)
+}
+
+
 func (s *APIService) peerId(w http.ResponseWriter, r *http.Request) {
 	//I figured out how to do this in the browser so its kind of deprecated now.
 	pubkeyB64 := r.Header.Get("X-Pubkey-B64")

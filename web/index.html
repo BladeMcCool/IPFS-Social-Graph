@@ -172,7 +172,10 @@
 <body>
   <!-- shameless table layout in the year 2021 . i welcome the css layout PR. -->
   <div class="wrapper">
-    <div class="hamburgers" onclick="menuswap()" style="text-align: center; cursor:pointer;"><p>&#x2630;</p></div>
+    <div class="hamburgers" style="text-align: center;">
+      <p onclick="menuswap()" style="text-align: center; cursor:pointer;">&#x2630;</p>
+      <p onclick="membersswap()" style="text-align: center; cursor:pointer;">&#x1F465;</p>
+    </div>
     <div id="rightpane">
 
       <div id="mainuipane" class="mainuipane">
@@ -252,7 +255,9 @@
         </table>
       </div>
 
+      <div id="memberspane" style="display:none"></div>
     </div>
+
 
     <div id="telentry_template" style="display:none">
       <div class="tlentry collapsed">

@@ -65,6 +65,50 @@ async function updateJsTimeline() {
     }
 }
 
+async function obtainFederatedProfilesInfo() {
+    let result = await makeRequest("GET", serviceBaseUrl + "/service/federationProfiles")
+    let decodedResult = JSON.parse(result)
+
+    ///TODO before calling this, show the empty area for this stuff to be put into
+    let outputEl = document.getElementById("memberspane")
+
+    for (let profileId of Object.keys(decodedResult)) {
+        let profileTipCid = decodedResult[profileId]
+        console.log(`${profileId} -> ${profileTipCid}`)
+        let obtainer = function(xProfileId, xProfileCid) {
+            getCidContentsByCat(xProfileCid, true).then(function(profileJson){
+                console.log(`GOT ${xProfileId} -> ${xProfileCid} -> ${profileJson}`)
+                let profileData = JSON.parse(profileJson)
+                let ptag = document.createElement("p")
+                ptag.classList.add("collapsed")
+                let atag = makeATag("&#x1f465;", function (profileId) {
+                    return async function () {
+                        let actuallyFollowed = await follow(profileId)
+                        if (!actuallyFollowed) {
+                            return false;
+                        }
+                        membersswap()
+                        focusPostText()
+                        return false;
+                    }
+                }(xProfileId), true)
+                ptag.appendChild(atag)
+                ptag.appendChild(document.createTextNode(profileNametag(profileData)))
+
+                outputEl.appendChild(ptag)
+                setTimeout(function(){
+                    ptag.classList.remove("collapsed")
+                    ptag.classList.add("expanded")
+                }, 100)
+                // TODO can put something good into the dom here now
+            }).catch(function(e){
+                console.log(`GOT ${xProfileId} -> ${xProfileCid} -> NODATA`)
+            })
+        }
+        obtainer(profileId, profileTipCid)
+    }
+}
+
 async function experiment2() {
     // if (!ipfsStarted) {
     //     await startIpfs()

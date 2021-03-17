@@ -90,7 +90,17 @@ async function setIdentity(keyname) {
     await loadJsTimeline()
     timelineUpdaterInterval = setInterval(() => {
         updateJsTimeline()
+        updateFriendlyTimestamps()
     }, 60000)
+}
+
+function updateFriendlyTimestamps() {
+    for (let profileId in gnOfInterestByProfileId) {
+        for (let k in gnOfInterestByProfileId[profileId]) {
+            let gnode = gnOfInterestByProfileId[profileId][k]
+            gnode.domElements.tsTextnode.textContent = cheesyDate(gnode.jsDate) + " "
+        }
+    }
 }
 
 async function initIdentity() {

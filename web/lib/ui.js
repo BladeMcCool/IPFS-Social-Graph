@@ -74,7 +74,7 @@ async function reloadSession() {
 async function createProfilePost() {
     if (!selectedIdentity) {
         alert("select an identity first please")
-        return
+        return false
     }
 
     let pubkeyb64 = identities[selectedIdentity]["pub"]
@@ -124,7 +124,7 @@ async function createProfilePost() {
         if (inputFlds[key]) {
             confirmText = confirmFields[key][0]
             if (!confirm("really " + confirmText + " " + inputFlds[key] + "?")) {
-                return
+                return false
             }
         }
     }
@@ -167,7 +167,7 @@ async function createProfilePost() {
     if (!hasRequiredFld) {
         alert("Please type some text for a post, follow/unfollow another profileid or otherwise set up some action to perform.")
         focusPostText()
-        return
+        return false
     }
 
     if (!inputFlds["text"] && inputFlds["inreplyto"]) {
@@ -255,6 +255,7 @@ async function createProfilePost() {
     // displayTimelineTextsFromServer(latestTimelineTextsJson)
     // await loadJsTimeline()
     await updateJsTimeline()
+    return true
 }
 
 async function loadServerHistory() {
@@ -275,7 +276,7 @@ function unfollow(profileId) {
 function follow(profileId) {
     //set the field and call the create post func.
     document.getElementById("followprofileid").value = profileId
-    createProfilePost()
+    return createProfilePost()
 }
 function retract(cid) {
     document.getElementById("retractionofnodecid").value = cid
@@ -1246,18 +1247,46 @@ function setEnterButtonAction(){
     }
 }
 
+let nottheMainScreen = ["menuthing", "memberspane"]
+function showMainScreen() {
+    for (let i = 0; i < nottheMainScreen.length; i++) {
+        let thingToHideEl = document.getElementById(nottheMainScreen[i])
+        thingToHideEl.style.display="none"
+    }
+    document.getElementById("mainuipane").style.display=""
+}
+function isMainScreenShowing() {
+    let mainthingHidden = document.getElementById("mainuipane").style.display == "none" ? true : false
+    if (!mainthingHidden) {
+        //already showing.
+        return true
+    }
+    return false
+}
+
 function menuswap() {
-    let menuHidden = document.getElementById("menuthing").style.display == "none" ? true : false
-    if (menuHidden) {
-        // document.getElementById("mainthing").style.display="none"
+    if (isMainScreenShowing()) {
         document.getElementById("mainuipane").style.display="none"
         document.getElementById("menuthing").style.display=""
     } else {
-        document.getElementById("menuthing").style.display="none"
-        // document.getElementById("mainthing").style.display=""
-        document.getElementById("mainuipane").style.display=""
+        showMainScreen()
     }
 }
+
+function membersswap() {
+    if (isMainScreenShowing()) {
+        let outputEl = document.getElementById("memberspane")
+        outputEl.textContent = ""
+
+        document.getElementById("mainuipane").style.display="none"
+        document.getElementById("memberspane").style.display=""
+    } else {
+        showMainScreen()
+    }
+    obtainFederatedProfilesInfo().catch(()=>{})
+}
+
+
 
 function toggle(thing) {
     thing = document.getElementById(`entry${thing}`)
