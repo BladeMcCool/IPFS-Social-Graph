@@ -195,13 +195,16 @@ function makeRequest(method, url, payload, track) {
             requestTracker[url] = xhr
         }
         xhr.open(method, url);
-        if (selectedIdentity == null) {
-            pubb64 = importPubkey
-        } else {
-            pubb64 = identities[selectedIdentity]["pub"]
+        if (url.includes("/service/")) {
+            //these methods behind /service all require a wl-d pubkey to work. but others should be open and not need this.
+            if (selectedIdentity == null) {
+                pubb64 = importPubkey
+            } else {
+                pubb64 = identities[selectedIdentity]["pub"]
+            }
+            console.log("sending this pub64:", pubb64)
+            xhr.setRequestHeader("X-Pubkey-B64", pubb64);
         }
-        console.log("sending this pub64:", pubb64)
-        xhr.setRequestHeader("X-Pubkey-B64", pubb64);
         xhr.onload = function() {
             if (this.status >= 200 && this.status < 300) {
                 resolve(xhr.response);
