@@ -93,10 +93,23 @@ async function setIdentity(keyname) {
     }, 60000)
 }
 
-async function newIdentity() {
+async function initIdentity() {
+    let name
+    while (!name) {
+        name = prompt("Please enter a Display Name to use for a new profile")
+    }
+    let bio = prompt("Please enter some text for a bio")
+    // document.getElementById("dispname").value = name
+    // document.getElementById("bio").value = bio
+    await newIdentity(name, name, bio)
+}
+
+async function newIdentity(newidentname, dispname, bio) {
     console.log('newIdentity: identities is: ', identities);
-    newidentname = getNewIdentName()
-    if (newidentname == undefined) {
+    if (!newidentname) {
+        newidentname = getNewIdentName()
+    }
+    if (!newidentname) {
         return
     }
 
@@ -115,8 +128,8 @@ async function newIdentity() {
     newIdentitySettings = {
         "pub":spkib64,
         "priv":pkcs8b64,
-        "dispname":"",
-        "bio":"",
+        "dispname": dispname ? dispname : "",
+        "bio": bio ? bio : "",
         "graphtip":"",
         "profiletip":"",
         "profileid":profileId,
@@ -124,9 +137,11 @@ async function newIdentity() {
     }
 
     identities[newidentname] = newIdentitySettings
+    selectedIdentity = newidentname
+    setSelectedIdentityProfileId()
     addIdentityToChoices(newidentname)
-    scrapeSettingsIntoSelectedIdentity() //so that when we updateSavedIdentites we keep whatever was in the fields.
     await setIdentity(newidentname)
+    scrapeSettingsIntoSelectedIdentity() //so that when we updateSavedIdentites we keep whatever was in the fields.
     await updateSavedIdentites(identities)
     clearIdentName()
 }
@@ -160,7 +175,8 @@ async function deleteSelectedIdentity() {
     removeSelectedIdentFromSelect(true)
     delete identities[removeIdentname]
     await updateSavedIdentites(identities)
-    unselectIdentity()
+    await localforage.setItem('selectedIdentity', keyname)
+    await unselectIdentity()
 }
 
 function scrapeSettingsIntoSelectedIdentity() {
@@ -178,9 +194,11 @@ function scrapeSettingsIntoSelectedIdentity() {
     identity["sendprivkey"] = document.getElementById("sendprivkey").checked
 }
 
-function unselectIdentity() {
+async function unselectIdentity() {
     selectedIdentity = null
     setSelectedIdentityProfileId()
+    localforage.setItem('selectedIdentity', selectedIdentity)
+
     document.getElementById("dispname").value = ""
     document.getElementById("bio").value = ""
     document.getElementById("graphtip").value = ""
@@ -288,7 +306,7 @@ async function chooseIdentity(keyname) {
     scrapeSettingsIntoSelectedIdentity()
     if (!keyname) {
         console.log("choose with no keyname , should wipe stuff")
-        unselectIdentity()
+        await unselectIdentity()
     } else {
         await setIdentity(keyname)
     }

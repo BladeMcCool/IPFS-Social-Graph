@@ -71,11 +71,13 @@ async function getUnsignedProfileWithFirstPost(pubkeyb64, unsignedGraphNodeJson,
     console.log("got unsignedProfileWithFirstPost (method2) result like:", result)
     return result
 }
-async function updateProfileCidOnServer(profileJson, profileCid) {
-    payload = {
+async function updateProfileCidOnServer(profileJson, profileCid, IPNSDelegate, privkeyb64) {
+    let payload = {
         "ProfileJson": profileJson,
         "ProfileTip": profileCid,
+        "IPNSDelegate": IPNSDelegate,
     }
+    payload.Signature = await getSignature(privkeyb64, profileCid+IPNSDelegate)
     console.log("updateProfileCidOnServer send payload like", JSON.stringify(payload))
     result = await makeRequest("POST", serviceBaseUrl + "/service/updateProfileCid", payload)
     console.log("got updateProfileCidOnServer result like:", result)

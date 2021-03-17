@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -609,6 +610,8 @@ func (s *APIService) publishedProfileCid(w http.ResponseWriter, r *http.Request)
 type UpdateProfileCidJsonArgs struct {
 	ProfileJson string
 	ProfileTip string
+	IPNSDelegate string
+	Signature []byte
 }
 func (s *APIService) updateProfileCid(w http.ResponseWriter, r *http.Request) {
 	var err error
@@ -621,7 +624,12 @@ func (s *APIService) updateProfileCid(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Printf("%#v", args)
+	//log.Printf("%#v", args)
+	if args.IPNSDelegate != IPFS.IPNSDelegateLegacyName {
+		log.Printf("wrong server, we are not %s", args.IPNSDelegate)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	profile := &Profile{}
 	err = json.Unmarshal([]byte(args.ProfileJson), profile)
@@ -650,13 +658,21 @@ func (s *APIService) updateProfileCid(w http.ResponseWriter, r *http.Request) {
 	}
 	validSig, err := fakeTl.checkProfileSignature(profile, pubkey)
 	if err != nil || !validSig {
-		log.Printf("invalid signature :(")
+		log.Printf("invalid signature on profile :(")
 		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	//// MAJOR TODO: accept a signature arg which should be a sig for the args.ProfileTip+our delegate name, and only accept the update if that is valid.
+	serializedInput := args.ProfileTip + args.IPNSDelegate
+	serializedInputHash := Crypter.makeMsgHashSum([]byte(serializedInput))
+	err = rsa.VerifyPSS(pubkey, crypto.SHA256, serializedInputHash, args.Signature, nil)
+	if err != nil {
+		log.Printf("invalid signature on request data :(")
+		log.Print(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	//dont really need to be doing this but ... why not ... we arent publishing the post content or graphnode stuff but why not this ... also i want to see that i get the same cid from both publishes here and in the client.
 	profileCidFromOurPublish := fakeTl.publishProfileToIPFS(profile) //TODO this should also return an err like the other publish

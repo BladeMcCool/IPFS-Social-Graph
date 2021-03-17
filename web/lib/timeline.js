@@ -97,7 +97,7 @@ async function unsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, fo
 
     if (text) {
         firstPostCid = await addContentsToIPFS(text)
-        let ts = cheesyDate(new Date())
+        let ts = (new Date()).toISOString().split('.')[0]+"Z"
         firstPost = {
             MimeType: "text/plain",
             Cid:      firstPostCid,
@@ -167,14 +167,14 @@ async function unsignedProfileWithFirstPost(pubkeyb64, UnsignedGraphNodeJson, Si
     return serializedUnsignedProfile
 }
 
-async function publishedProfileCid(pubkeyb64, unsignedProfileJson, profileSigb64) {
+async function publishedProfileCid(pubkeyb64, privkeyb64, unsignedProfileJson, profileSigb64, IPNSDelegate) {
     let profile = JSON.parse(unsignedProfileJson)
     profile.Signature = profileSigb64
     let profileJson = stableJson(profile, function(a, b){
         return keyOrder["Profile"][a.key] > keyOrder["Profile"][b.key] ? 1 : -1;
     })
     let profileCid = await addContentsToIPFS(profileJson)
-    let serverReportedCid = await updateProfileCidOnServer(profileJson, profileCid) //TODO maybe this call and the assembly of the final json with the signature dont belong in this function. probably outside of it before/after
+    let serverReportedCid = await updateProfileCidOnServer(profileJson, profileCid, IPNSDelegate, privkeyb64) //TODO maybe this call and the assembly of the final json with the signature dont belong in this function. probably outside of it before/after
 
     return profileCid
 }
@@ -470,6 +470,7 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
                 for (let i = 0; i < currentGn["publicufollow"].length; i++) {
                     let unfollowProfileId = currentGn["publicufollow"][i]
                     unfollows[unfollowProfileId] = true
+                    removeUnfolloweePosts(unfollowProfileId)
                 }
             }
             if (currentGn["publicfollow"]) {

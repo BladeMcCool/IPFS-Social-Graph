@@ -18,7 +18,9 @@ import (
 type IPFSCommunicator struct {
 	shell *shell.Shell
 	IPNSDelegateKeyName string
-	IPNSDelegateExpectPublishName string
+	//IPNSDelegateExpectPublishName string
+	IPNSDelegateName string
+	IPNSDelegateLegacyName string
 }
 func(ic *IPFSCommunicator) makeKeyInIPFS(keyName string) error {
 	key, err := ic.shell.KeyGen(context.Background(), keyName, shell.KeyGen.Type("rsa"))
@@ -245,6 +247,12 @@ func (ic *IPFSCommunicator) addPrivKeyIPNSPublish(key *rsa.PrivateKey, profileId
 func (ic *IPFSCommunicator) InitProfileCache() {
 	CacheProfileCids = ttlcache.NewCache()
 	CacheProfileCids.SetTTL(24 * time.Hour)
+}
+
+func (ic *IPFSCommunicator) InitDelegateName() error {
+	var err error
+	ic.IPNSDelegateName, ic.IPNSDelegateLegacyName, err = IPFS.getIPNSDelegateName()
+	return err
 }
 func (ic *IPFSCommunicator) StartIPNSPeriodicUpdater() {
 	//delegateIPNSMutex.RLock()

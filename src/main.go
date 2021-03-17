@@ -36,15 +36,15 @@ func main() {
 
 func initializers() {
 	IPFS.InitProfileCache()
-	Trash.prepareDumpsterToReceiveTrash()
-
-	IPNSDelegateName, publishChannelName, err := IPFS.getIPNSDelegateName()
+	err := IPFS.InitDelegateName()
 	if err != nil {
 		panic(fmt.Sprintf("startup failure: %s", err.Error()))
 	}
+
+	Trash.prepareDumpsterToReceiveTrash()
 	Federation = IPNSDelegateFederation{
-		ipnsName: IPNSDelegateName,
-		publishChannelName: publishChannelName,
+		ipnsName: IPFS.IPNSDelegateName,
+		publishChannelName: IPFS.IPNSDelegateLegacyName,
 		memberNames: getIPNSFederationMembernames(),
 		ipfs: IPFS,
 	}
@@ -93,8 +93,9 @@ func getIpfsKeystorePath() string {
 func getWlBaseProfileIdList() []string {
 	val, ok := os.LookupEnv("CIDDAG_WL_PROFILEIDS")
 	if !ok {
-		log.Printf("CIDDAG_WL_PROFILEIDS should list at least one profileid (csv list)")
-		os.Exit(1)
+		log.Printf("note: missing CIDDAG_WL_PROFILEIDS")
+		return []string{}
+		//os.Exit(1)
 	}
 	if val == "" { return nil }
 	return strings.Split(val, ",")

@@ -33,7 +33,7 @@ function resetTextTimelineArea() {
 }
 
 function setSelectedIdentityProfileId() {
-    if (selectedIdentity) {
+    if (selectedIdentity && identities[selectedIdentity]) {
         selectedIdentityProfileId = identities[selectedIdentity]["profileid"]
     } else {
         selectedIdentityProfileId = null
@@ -47,15 +47,18 @@ async function reloadSession() {
     try {
         identities = await localforage.getItem('identities');
         selectedIdentity = await localforage.getItem('selectedIdentity');
-        setSelectedIdentityProfileId()
+        if (selectedIdentity) {
+            setSelectedIdentityProfileId()
+        }
         console.log("identities already there", identities);
         console.log("selectedIdentity already there", selectedIdentity);
     } catch (err) {
         console.log("load oops:", err);
     }
-    if (!identities) {
+    if (!identities || Object.keys(identities).length === 0) {
         console.log("no existing identities found in indexeddb");
         identities = {}
+        await initIdentity()
         return
     }
     if (!identities[selectedIdentity]) {
@@ -65,7 +68,7 @@ async function reloadSession() {
     for (var idname of Object.keys(identities)) {
         addIdentityToChoices(idname)
     }
-    setIdentity(selectedIdentity)
+    await setIdentity(selectedIdentity)
 }
 
 async function createProfilePost() {
@@ -226,7 +229,8 @@ async function createProfilePost() {
     console.log("got signature for that like:", profileSigb64)
     privkeyb64foripns = sendprivkey ? privkeyb64 : null
     // updatedProfileCid = await getPublishedProfileCid(pubkeyb64, privkeyb64foripns, unsignedProfileJson, profileSigb64)
-    updatedProfileCid = await publishedProfileCid(pubkeyb64, unsignedProfileJson, profileSigb64)
+
+    updatedProfileCid = await publishedProfileCid(pubkeyb64, privkeyb64, unsignedProfileJson, profileSigb64, unsignedProfile.IPNSDelegate ? unsignedProfile.IPNSDelegate : "")
     document.getElementById("profiletip").value = updatedProfileCid
 
     scrapeSettingsIntoSelectedIdentity() //so that when we updateSavedIdentites we keep whatever was in the fields.
@@ -234,6 +238,9 @@ async function createProfilePost() {
 
     if (inputFlds["followprofileid"]) {
         delete unfollows[inputFlds["followprofileid"]] //otherwise spidering code will not re-add anything that was previously unfollowed.
+    }
+    if (inputFlds["unfollowprofileid"]) {
+        delete follows[inputFlds["unfollowprofileid"]] //otherwise spidering code will not un-add anything that was previously followed.
     }
     // followprofileid
     // unfollowprofileid
@@ -396,41 +403,27 @@ function fixMissingTsItemsRelatedTo(profileId, foundTs) {
     let timelineEl = document.getElementById("tlcontainer")
     for (let i = 0; i < noTsGnodes[profileId].length; i++) {
         let gnode = noTsGnodes[profileId][i]
-
+        let removedFromDom = false
         //we need to:
         try {
-
             if (gnode.includeInMainTl) {
                 //  remove it from the dom
                 timelineEl.removeChild(gnode.domElements.container)
                 //  remove it from the ordered array
                 orderedTimelineElements.splice(orderedTimelineElements.indexOf(gnode), 1)
-            } else {
-                console.log("unsure at this time how to remove and reinsert from non maintl stuff.")
-                continue
-
-                // wait i'm concerned with replies in the code below but i dont think it really applies. because replies will be timestamped already durr
-                // i thought the code below would work, but still getting errors. i think retractions are causing it.
-                // if there actually are any nested things that arent sorting right due to lack of ts then some code like below might help locate.
-                // let replyParent = gnReplyParents[gnode.Cid]
-                // let replyContainer = replyParent.domElements.replyContainer //if we're in here the gnReplyParent, either real target or a temp dummy one, must already exist.
-                // if (replyContainer.contains(gnode.domElements.container)) {
-                //     // I'm not sure this is working.
-                //     replyContainer.removeChild(gnode.domElements.container)
-                //     replyParent.replies.splice(replyParent.replies.indexOf(gnode), 1)
-                //     console.log("YAY?")
-                // }
+                removedFromDom = true
             }
-
-
-
         } catch(e) {
             console.log("fixMissingTsItemsRelatedTo error", e)
         }
         //  fix the ts (set .jsDate and .Date)
         gnode.Date = foundTs
         gnode.jsDate = jsDate
-        //  jam it back in
+
+        if (!removedFromDom) {
+            return
+        }
+        //  jam it back in, if we popped it out while we fixed it up.
         //  now, i would LIKE to update the text that is displayed in the date lines for the rows we just jammed back in but we dont have a reference for just that bit.
         //  would like to be able to write the below, but not everything is putting the tsTextnode yet ... wait a gnode should only need taht done once for it. and dont need to be done how it is.
         gnode.domElements.tsTextnode.textContent = cheesyDate(gnode.jsDate) + " "
@@ -439,6 +432,51 @@ function fixMissingTsItemsRelatedTo(profileId, foundTs) {
     }
     // remove the stuff for this profile id from the noTsGnodes list since they all should have something now.
     delete noTsGnodes[profileId]
+}
+
+function removeUnfolloweePosts(profileId) {
+
+    if (!gnOfInterestByProfileId[profileId]) { return }
+
+    let domEaseoutPopper = function(el, removeFrom) {
+        el.classList.remove("expanded")
+        el.classList.add("collapsed")
+        setTimeout(function(){
+            removeFrom.removeChild(el)
+        }, 600) //the animation itself should take 500ms
+    }
+    let timelineEl = document.getElementById("tlcontainer")
+    for (let k in gnOfInterestByProfileId[profileId]) {
+        let gnode = gnOfInterestByProfileId[profileId][k]
+        try {
+            if (gnode.includeInMainTl) {
+                //  remove it from the dom
+                // timelineEl.removeChild(gnode.domElements.container)
+                domEaseoutPopper(gnode.domElements.container, timelineEl)
+                //  remove it from the ordered array
+                orderedTimelineElements.splice(orderedTimelineElements.indexOf(gnode), 1)
+            } else {
+                console.log("unsure at this time how to remove and reinsert from non maintl stuff.")
+                if (gnode.post && gnode.post.Reply && gnode.post.Reply.length > 0) {
+                    for (let i = 0; i < gnode.post.Reply.length; i++) {
+                        let replyTo = gnode.post.Reply[i]
+                        let replyParent = gnReplyParents[replyTo]
+                        let replyContainer = replyParent.domElements.replyContainer //if we're in here the gnReplyParent, either real target or a temp dummy one, must already exist.
+                        if (!replyContainer.contains(gnode.domElements.container)) {
+                            continue //but am i doing something wrong if i'm getting here???
+                        }
+                        domEaseoutPopper(gnode.domElements.container, replyContainer)
+                        // replyContainer.removeChild(gnode.domElements.container)
+                        replyParent.replies.splice(replyParent.replies.indexOf(gnode), 1)
+                    }
+                }
+            }
+        } catch(e) {
+            console.log("removeUnfolloweePosts error", e)
+        }
+    }
+    // remove the stuff for this profile id from the gnOfInterestByProfileId
+    delete gnOfInterestByProfileId[profileId]
 }
 
 // function checkIfRetracted(gnode) {
@@ -566,7 +604,8 @@ function makeGnodeTitle(gnode) {
     }
     // console.log(gnode)
     // console.log(gnode.jsDate)
-    // title += `\nDate: ${gnode.jsDate.toISOString().split('.')[0]+"Z"}`
+    title += `\nDate: ${gnode.jsDate.toISOString().split('.')[0] + "Z"}`
+
     return title
 }
 
