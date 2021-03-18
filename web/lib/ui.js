@@ -296,25 +296,26 @@ async function loadRecaptchaScript(profileId) {
 // }
 
 async function canTalk(profileId, pubb64) {
-    try {
-        return await new Promise(async function (resolve) {
-            let codeCb = function (status) {
-                let canTalk = false
-                if (status >= 200 && status < 300) {
-                    canTalk = true
-                }
-                if ((status >= 400 && status < 500) && (status != 403)) {
-                    canTalk = true
-                }
-                resolve(canTalk)
+    return await new Promise(async function (resolve) {
+        let codeCb = function (status) {
+            let canTalk = false
+            if (status >= 200 && status < 300) {
+                canTalk = true
             }
-            let payload = {"profileId": profileId}
+            if ((status >= 400 && status < 500) && (status != 403)) {
+                canTalk = true
+            }
+            resolve(canTalk)
+        }
+        let payload = {"profileId": profileId}
+        try {
             await makeRequest("POST", serviceBaseUrl + "/service/profileBestTipCid", payload, true, codeCb, pubb64)
-        })
-    } catch(e) {
-        return false
-    }
+        } catch(e) {
+            ///
+        }
+    })
 }
+
 
 async function authedCheck(profileId, pubb64) {
     // check profile best tip from server for this.
@@ -325,6 +326,7 @@ async function authedCheck(profileId, pubb64) {
     // if get a better code, we're good
     // otherwise naaa
     // and naa for bad captcha
+
     if (await canTalk(profileId, pubb64)) {
         return true
     }
@@ -1398,6 +1400,7 @@ myOnload = async function() {
     await reloadSession()
     setEnterButtonAction()
     focusPostText()
+    hideSpinner()
 }
 
 window.addEventListener('DOMContentLoaded', myOnload, false);

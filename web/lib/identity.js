@@ -42,7 +42,9 @@ async function setIdentity(keyname) {
     // }
     let profileTipDataFromServer = undefined;
     try {
+        showSpinner()
         await authedCheck(identity["profileid"], identity["pub"])
+        hideSpinner()
         profileTipDataFromServer = await profileBestTip(identity["profileid"])
     } catch (e) {
         console.log("failed to get best tip from server, oh well.")
@@ -134,7 +136,9 @@ async function newIdentity(newidentname, dispname, bio) {
     // if (!await loadRecaptchaScript(profileId)) {
     //     return
     // }
+    showSpinner()
     await authedCheck(profileId, spkib64)
+    hideSpinner()
     if (!newidentname) {
         newidentname = getNewIdentName()
     }
