@@ -16,7 +16,6 @@ type Lister struct {
 	BaseWlProfileIdList []string
 }
 
-
 func (l *Lister) CheckWl(profileId string) bool {
 	l.WlProfileIdMutex.Lock()
 	defer l.WlProfileIdMutex.Unlock()
@@ -61,6 +60,7 @@ func (l *Lister) setupBl() {
 	for i, _ := range data {
 		bl[i] = true
 	}
+	log.Printf("setupBl - %d bl entries", len(bl))
 
 	l.WlProfileIdMutex.RLock()
 	defer l.WlProfileIdMutex.RUnlock()

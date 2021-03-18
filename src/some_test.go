@@ -1014,6 +1014,7 @@ func Test_IPNSDelegateFederation(t *testing.T) {
 		Members : []IPNSFederationMember{ fedMember1, fedMember2 },
 		IPNSDelegatedProfileCids: map[string]string{},
 	}
+	testFederation.setLister(&Lister{})
 	testFederation.PullUpdatesAndSelectBestTips()
 
 	for i, e := range timelines {
