@@ -68,6 +68,9 @@ func (l *Lister) setupBl() {
 }
 
 func (l *Lister) setupWl() {
+	if l.WlProfileIds == nil {
+		l.WlProfileIds = map[string]bool{}
+	}
 	for _, profileId := range l.BaseWlProfileIdList {
 		l.WlProfileIds[profileId] = true
 		l.BaseWlProfileIds[profileId] = true
