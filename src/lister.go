@@ -8,9 +8,10 @@ import (
 	"time"
 )
 
-type Lister struct {
+type  Lister struct {
 	WlProfileIds        map[string]bool
 	BlProfileIds        map[string]bool
+	//TODO captchaWl separate from BaseWL and during the periodic rebuild just add those captcha ones back in.
 	BaseWlProfileIds    map[string]bool
 	WlProfileIdMutex    sync.RWMutex
 	BaseWlProfileIdList []string
@@ -24,13 +25,16 @@ func (l *Lister) CheckWl(profileId string) bool {
 	}
 	return false
 }
-func (l *Lister) SetWl(profileId string) {
+func (l *Lister) SetBaseWl(profileId string) {
 	l.WlProfileIdMutex.RLock()
 	defer l.WlProfileIdMutex.RUnlock()
 	if _, found := l.BlProfileIds[profileId]; found {
 		// NOT adding anything from the Bl to the Wl.
+		log.Printf("SetBaseWl: not adding %s due to presence in bl", profileId)
 		return
 	}
+	log.Printf("SetBaseWl: adding %s to Wl", profileId)
+	l.BaseWlProfileIds[profileId] = true
 	l.WlProfileIds[profileId] = true
 }
 func (l *Lister) CheckBl(profileId string) bool {
@@ -83,7 +87,7 @@ func (l *Lister) setupWl() {
 	log.Printf("setupWl added %d profiles to the approved list", len(l.BaseWlProfileIdList))
 }
 func (l *Lister) setupExtendedWl(s *APIService) {
-	minCycleTimeSec := float64(90)
+	minCycleTimeSec := float64(5)
 	log.Println("setupExtendedWl starting up")
 	for {
 
@@ -98,7 +102,7 @@ func (l *Lister) setupExtendedWl(s *APIService) {
 
 		//added := map[string]int64{}
 		log.Printf("setupExtendedWl total number of wl profiles in extended wl before processing update: %d", len(l.WlProfileIds))
-		for _, profileId := range l.BaseWlProfileIdList {
+		for profileId, _ := range l.BaseWlProfileIds {
 			log.Printf("setupExtendedWl going to add followees of baseWl profileid %s", profileId)
 			wg.Add(1)
 			go func(profileId string) {

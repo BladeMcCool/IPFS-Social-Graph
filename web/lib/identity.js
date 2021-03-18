@@ -42,6 +42,7 @@ async function setIdentity(keyname) {
     // }
     let profileTipDataFromServer = undefined;
     try {
+        await authedCheck(identity["profileid"], identity["pub"])
         profileTipDataFromServer = await profileBestTip(identity["profileid"])
     } catch (e) {
         console.log("failed to get best tip from server, oh well.")
@@ -129,9 +130,11 @@ async function newIdentity(newidentname, dispname, bio) {
     console.log("privkey b64 in pkcs8", pkcs8b64)
     profileId = await peerutil.peerid(spkib64)
 
-    if (!await loadRecaptchaScript(profileId)) {
-        return
-    }
+
+    // if (!await loadRecaptchaScript(profileId)) {
+    //     return
+    // }
+    await authedCheck(profileId, spkib64)
     if (!newidentname) {
         newidentname = getNewIdentName()
     }

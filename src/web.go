@@ -48,7 +48,7 @@ func (s *APIService) Start() {
 		// do this: (thanks https://gist.github.com/denji/12b3a568f092ab951456)
 		// openssl ecparam -genkey -name secp384r1 -out server.key
 		// openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650
-		handler := s.getHttpHandler(false)
+		handler := s.getHttpHandler(true)
 		go func() {
 			err := http.ListenAndServeTLS(":4443", "server.crt", "server.key", handler)
 			if err != nil {
@@ -210,12 +210,13 @@ func (s *APIService) getHistoryFollows(profileId string) []string {
 func (s *APIService) WlProfileIdViaPubkeyHeaderAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		//log.Printf("WlProfileIdViaPubkeyHeaderAuthMiddleware r.Url like %#v", r.URL)
-		if r.TLS == nil {
-			// if not doing https, its because its running locally and therefore locking the server down isnt much of a concern.
-			log.Printf("WlProfileIdViaPubkeyHeaderAuthMiddleware not https -- allowing request")
-			next.ServeHTTP(w, r)
-			return
-		}
+
+		//if r.TLS == nil {
+		//	// if not doing https, its because its running locally and therefore locking the server down isnt much of a concern.
+		//	log.Printf("WlProfileIdViaPubkeyHeaderAuthMiddleware not https -- allowing request")
+		//	next.ServeHTTP(w, r)
+		//	return
+		//}
 
 		profileId, onWl := s.checkHeaderForPubkeyOnWl(r.Header.Get("X-Pubkey-B64"))
 		if !onWl {
@@ -285,7 +286,7 @@ func (s *APIService) verifyRecaptchaToken(w http.ResponseWriter, r *http.Request
 	//s.WlProfileIdMutex.RLock()
 	//defer s.WlProfileIdMutex.RUnlock()
 	//s.WlProfileIds[args.ProfileId] = true
-	s.Lister.SetWl(args.ProfileId)
+	s.Lister.SetBaseWl(args.ProfileId)
 	w.WriteHeader(http.StatusNoContent)
 }
 

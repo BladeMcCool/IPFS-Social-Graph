@@ -291,6 +291,57 @@ async function loadRecaptchaScript(profileId) {
         document.head.appendChild(script); //or something of the likes
     })
 }
+// if (!await loadRecaptchaScript(profileId)) {
+//     return
+// }
+
+async function canTalk(profileId, pubb64) {
+    try {
+        return await new Promise(async function (resolve) {
+            let codeCb = function (status) {
+                let canTalk = false
+                if (status >= 200 && status < 300) {
+                    canTalk = true
+                }
+                if ((status >= 400 && status < 500) && (status != 403)) {
+                    canTalk = true
+                }
+                resolve(canTalk)
+            }
+            let payload = {"profileId": profileId}
+            await makeRequest("POST", serviceBaseUrl + "/service/profileBestTipCid", payload, true, codeCb, pubb64)
+        })
+    } catch(e) {
+        return false
+    }
+}
+
+async function authedCheck(profileId, pubb64) {
+    // check profile best tip from server for this.
+    //  (using identities[selectedIdentity]["profileid"] since the makeRequest will pull pubkey from same spot for auth by header pubkey-to-peerid-in-wl auth check :)
+    // if we get any code lower than 500 that is not 403, then we're good
+    // if we get a 403 try the captcha other than a 403 error, then try captcha.
+    // if captcha says good, try again for better code.
+    // if get a better code, we're good
+    // otherwise naaa
+    // and naa for bad captcha
+    if (await canTalk(profileId, pubb64)) {
+        return true
+    }
+    //can't talk, try captcha
+    let recaptchaSuccess = await loadRecaptchaScript(profileId)
+    if (!recaptchaSuccess) {
+        return false
+    }
+
+    //well thats great. that means we _should_ get a 200 or a 404 most likely.
+    if (await canTalk(profileId, pubb64)) {
+        return true
+    }
+
+    alert("Failed auth check, won't be able to do much.")
+    return false
+}
 
 function performRecaptchaChallenge(profileId) {
     return new Promise(function(resolve) {

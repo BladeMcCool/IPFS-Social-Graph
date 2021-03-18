@@ -183,7 +183,7 @@ async function verifyRecaptchaToken(profileId, token) {
 
 
 var requestTracker = {}
-function makeRequest(method, url, payload, track) {
+function makeRequest(method, url, payload, track, codeCb, pubb64) {
     //thank you mister https://jacoby.github.io/js/2018/10/04/field-notes-on-vanilla-javascript-and-asyncawait-with-xhr.html, such convenience.
     if (!track) {
         track = false
@@ -197,15 +197,18 @@ function makeRequest(method, url, payload, track) {
         xhr.open(method, url);
         if (url.includes("/service/")) {
             //these methods behind /service all require a wl-d pubkey to work. but others should be open and not need this.
-            if (selectedIdentity == null) {
-                pubb64 = importPubkey
-            } else {
-                pubb64 = identities[selectedIdentity]["pub"]
+            if (!pubb64) {
+                if (selectedIdentity == null) {
+                    pubb64 = importPubkey
+                } else {
+                    pubb64 = identities[selectedIdentity]["pub"]
+                }
             }
             console.log("sending this pub64:", pubb64)
             xhr.setRequestHeader("X-Pubkey-B64", pubb64);
         }
         xhr.onload = function() {
+            if (codeCb) { codeCb(this.status ) }
             if (this.status >= 200 && this.status < 300) {
                 resolve(xhr.response);
             } else {
