@@ -87,7 +87,7 @@ func (l *Lister) setupWl() {
 	log.Printf("setupWl added %d profiles to the approved list", len(l.BaseWlProfileIdList))
 }
 func (l *Lister) setupExtendedWl(s *APIService) {
-	minCycleTimeSec := float64(5)
+	minCycleTimeSec := float64(90)
 	log.Println("setupExtendedWl starting up")
 	for {
 

@@ -48,7 +48,7 @@ func (s *APIService) Start() {
 		// do this: (thanks https://gist.github.com/denji/12b3a568f092ab951456)
 		// openssl ecparam -genkey -name secp384r1 -out server.key
 		// openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650
-		handler := s.getHttpHandler(true)
+		handler := s.getHttpHandler(false)
 		go func() {
 			err := http.ListenAndServeTLS(":4443", "server.crt", "server.key", handler)
 			if err != nil {
