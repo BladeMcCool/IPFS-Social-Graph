@@ -89,6 +89,7 @@ type IPNSDelegateFederation struct {
 	publishChannelName       string
 	ipfs                     *IPFSCommunicator
 	bestTips                 map[string]string
+	lister                   *Lister
 	initialized              bool
 }
 func (df *IPNSDelegateFederation) Init() {
@@ -101,6 +102,10 @@ func (df *IPNSDelegateFederation) Init() {
 	df.pubsubUpdatesMutex.Lock()
 	df.pubsubUpdatedProfileCids = map[string]string{}
 	df.pubsubUpdatesMutex.Unlock()
+
+	if df.lister == nil {
+		df.lister = &Lister{}
+	}
 
 	baseMember := IPNSFederationMember{
 		name: "self",
@@ -134,10 +139,17 @@ func (df *IPNSDelegateFederation) Init() {
 	//df.initialized = true
 	//df.RunBackgroundUpdateFetcherProcessor()
 }
+func (df *IPNSDelegateFederation) setLister(l *Lister) {
+	df.lister = l
+}
+
 func (df *IPNSDelegateFederation) mergeInProfileTipCids(profileTipCids map[string]string) {
 	df.mutex.Lock()
 	defer df.mutex.Unlock()
 	for profileId, profileCid := range profileTipCids {
+		if df.lister.CheckBl(profileId) {
+			continue
+		}
 		//if _, found := df.clientUpdatedProfileCids[profileId]; found {
 		//	//i'm not really sure this is an actual issue .... i want to log when this happens for now and allow it.
 		//	log.Printf("mergeInProfileTipCids overwriting protected profileid %s with cid %s", profileId, profileCid)

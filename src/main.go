@@ -6,30 +6,31 @@ import (
 	"log"
 	"os"
 	"strings"
-	"sync"
 )
 
 func main() {
 	log.Printf("Starting IPFS Social Graph Server ...")
+	lister := &Lister{
+		BaseWlProfileIdList: getWlBaseProfileIdList(),
+	}
 	service := &APIService{
 		TimeService:         &defaultTimeService{},
-		WlProfileIds:        map[string]bool{},
-		BaseWlProfileIds:    map[string]bool{},
-		WlProfileIdMutex:    sync.RWMutex{},
+		Lister: lister,
 		ListenPort:          getServiceHttpListenPort(),
 		TLSHostName:         getTLSHostName(),
 		TLSDataDir: getTLSDataDir(),
-		BaseWlProfileIdList: getWlBaseProfileIdList(),
 		RecaptchaSecretKey: getRecaptchaSecretKey(),
 		RecaptchaSiteKey: getRecaptchaSiteKey(),
 	}
 	initializers()
 	go IPFS.StartIPNSPeriodicUpdater()
-	go service.setupWl()
+	service.Lister.setupWl()
+	service.Lister.setupBl()
 	go func() {
 		//these are each going to do IPNS stuff so dont want them running concurrently. (just seems to lead to context timeouts)
+		Federation.setLister(lister)
 		Federation.Init()
-		go service.setupExtendedWl()
+		go service.Lister.setupExtendedWl(service)
 		log.Printf("Federation membership size: %d", len(Federation.Members))
 		go Federation.RunBackgroundUpdateFetcherProcessor()
 	}()
@@ -149,9 +150,6 @@ func getRecaptchaSiteKey() string {
 	}
 	return ""
 }
-
-
-
 
 func checkError(err error) {
 	if err != nil {

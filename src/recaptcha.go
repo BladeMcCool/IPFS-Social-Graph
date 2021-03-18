@@ -46,17 +46,17 @@ func CheckRecaptcha(secret, response string) error {
 		return err
 	}
 
-	// Check recaptcha verification success.
+	// CheckWl recaptcha verification success.
 	if !body.Success {
 		return errors.New("unsuccessful recaptcha verify request")
 	}
 
-	// Check response score.
+	// CheckWl response score.
 	if body.Score < 0.5 {
 		return errors.New("lower received score than expected")
 	}
 
-	// Check response action.
+	// CheckWl response action.
 	if body.Action != "wlrequest" {
 		return errors.New("mismatched recaptcha action")
 	}

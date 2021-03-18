@@ -14,7 +14,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"log"
 	"os"
-	"sync"
+	//"sync"
 	"time"
 
 	//ipns "github.com/ipfs/go-ipns"
@@ -24,12 +24,9 @@ import (
 
 type APIService struct {
 	TimeService         TimeService
-	WlProfileIds        map[string]bool
-	BaseWlProfileIds    map[string]bool
-	WlProfileIdMutex    sync.RWMutex
+	Lister  *Lister
 	FilePathOverride    string
 	ListenPort          string
-	BaseWlProfileIdList []string
 	TLSHostName         string
 	TLSDataDir          string
 	RecaptchaSecretKey string
@@ -189,61 +186,7 @@ func forceHttps() *http.ServeMux {
 	return mux
 }
 
-func (s *APIService) setupWl() {
-	for _, profileId := range s.BaseWlProfileIdList {
-		s.WlProfileIds[profileId] = true
-		s.BaseWlProfileIds[profileId] = true
-	}
-	log.Printf("setupWl added %d profiles to the approved list", len(s.BaseWlProfileIdList))
-}
-func (s *APIService) setupExtendedWl() {
-	minCycleTimeSec := float64(90)
-	log.Println("setupExtendedWl starting up")
-	for {
 
-		start := time.Now()
-		wg := sync.WaitGroup{}
-
-		newWlMu := sync.Mutex{}
-		newWlProfileIds := map[string]bool{}
-		//s.WlProfileIdMutex.Lock()
-		//s.WlProfileIds =
-		//s.WlProfileIdMutex.Unlock()
-
-		//added := map[string]int64{}
-		log.Printf("setupExtendedWl total number of wl profiles in extended wl before processing update: %d", len(s.WlProfileIds))
-		for _, profileId := range s.BaseWlProfileIdList {
-			log.Printf("setupExtendedWl going to add followees of baseWl profileid %s", profileId)
-			wg.Add(1)
-			go func(profileId string) {
-				historyWls := s.getHistoryFollows(profileId)
-				newWlMu.Lock()
-				newWlProfileIds[profileId] = true
-				for _, followeePprofileId := range historyWls {
-					newWlProfileIds[followeePprofileId] = true
-					log.Printf("setupExtendedWl baseWl %s follow of %s (add to wl)", profileId, followeePprofileId)
-				}
-				newWlMu.Unlock()
-				log.Printf("setupExtendedWl added %d entries on behalf of profileId %s", len(historyWls), profileId)
-				wg.Done()
-			}(profileId)
-		}
-		wg.Wait()
-		log.Printf("setupExtendedWl: finished after %.2f sec", time.Since(start).Seconds())
-		s.WlProfileIdMutex.Lock()
-		s.WlProfileIds = newWlProfileIds
-		log.Printf("setupExtendedWl total number of wl profiles in extended wl after processing update: %d", len(s.WlProfileIds))
-		s.WlProfileIdMutex.Unlock()
-
-		tookSec := time.Since(start).Seconds()
-		log.Printf("setupExtendedWl took %.2f sec to complete this cycle getting wl extension from %d BaseWlProfileIdListed profile histories", tookSec, len(s.BaseWlProfileIdList))
-		if tookSec < minCycleTimeSec {
-			// make sure we don't slam it more than we have to.
-			time.Sleep(time.Duration(minCycleTimeSec-tookSec) * time.Second)
-		}
-
-	}
-}
 
 func (s *APIService) getHistoryFollows(profileId string) []string {
 	tl := &Timeline{
@@ -294,9 +237,12 @@ func (s *APIService) checkHeaderForPubkeyOnWl(pubkeyB64 string) (string, bool) {
 		return "", false
 	}
 	profileId := Crypter.getPeerIDBase58FromPubkey(pubkey)
-	s.WlProfileIdMutex.RLock()
-	defer s.WlProfileIdMutex.RUnlock()
-	if _, found := s.WlProfileIds[profileId]; !found {
+	//s.WlProfileIdMutex.RLock()
+	//defer s.WlProfileIdMutex.RUnlock()
+	//if _, found := s.WlProfileIds[profileId]; !found {
+	//	return profileId, false
+	//}
+	if !s.Lister.CheckWl(profileId) {
 		return profileId, false
 	}
 	log.Printf("checkHeaderForPubkeyOnWl: %s is on the list.", profileId)
@@ -336,9 +282,10 @@ func (s *APIService) verifyRecaptchaToken(w http.ResponseWriter, r *http.Request
 
 	//so, it was good then i guess. let em in.
 	log.Printf("verifyRecaptchaToken PASSED: FOR USER OF PROFILE ID %s", args.ProfileId)
-	s.WlProfileIdMutex.RLock()
-	defer s.WlProfileIdMutex.RUnlock()
-	s.WlProfileIds[args.ProfileId] = true
+	//s.WlProfileIdMutex.RLock()
+	//defer s.WlProfileIdMutex.RUnlock()
+	//s.WlProfileIds[args.ProfileId] = true
+	s.Lister.SetWl(args.ProfileId)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -521,14 +468,14 @@ func (s *APIService) unsignedProfileWithFirstPost(w http.ResponseWriter, r *http
 
 	//if the person doing some following is on the base wl (check with lock), put the followee people into the live wl.
 	if graphNode.PublicFollow != nil {
-		s.WlProfileIdMutex.Lock()
-		if _, found := s.BaseWlProfileIds[graphNode.ProfileId]; found {
+		s.Lister.WlProfileIdMutex.Lock()
+		if _, found := s.Lister.BaseWlProfileIds[graphNode.ProfileId]; found {
 			for _, followProfileId := range graphNode.PublicFollow {
-				s.WlProfileIds[followProfileId] = true
+				s.Lister.WlProfileIds[followProfileId] = true
 			}
 			log.Printf("Added new follow by baseWl profile id %s of followee profile id %s to the live profile wl", graphNode.ProfileId, graphNode.ProfileId)
 		}
-		s.WlProfileIdMutex.Unlock()
+		s.Lister.WlProfileIdMutex.Unlock()
 	}
 
 	pubKeyBytes, pubKeyHash := fakeTl.calculateProfileId(pubkey)
