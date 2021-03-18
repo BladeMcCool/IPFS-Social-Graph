@@ -41,9 +41,13 @@ func (l *Lister) CheckBl(profileId string) bool {
 	}
 	return false
 }
-func (l *Lister) setupBl() {
+func (l *Lister) setupBl(dir string) {
 	// read the file.
-	file, err := ioutil.ReadFile("bl.json") //its totally fine if this isnt here, we will just skip having it then.
+	filePath := "bl.json"
+	if dir != "" {
+		filePath = dir + "/" + filePath
+	}
+	file, err := ioutil.ReadFile(filePath) //its totally fine if this isnt here, we will just skip having it then.
 	if err != nil {
 		log.Printf("setupBl err reading file %s", err.Error())
 		return

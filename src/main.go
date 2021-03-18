@@ -25,7 +25,7 @@ func main() {
 	initializers()
 	go IPFS.StartIPNSPeriodicUpdater()
 	service.Lister.setupWl()
-	service.Lister.setupBl()
+	service.Lister.setupBl(service.TLSDataDir)
 	go func() {
 		//these are each going to do IPNS stuff so dont want them running concurrently. (just seems to lead to context timeouts)
 		Federation.setLister(lister)
