@@ -65,6 +65,7 @@ async function updateJsTimeline() {
     }
 }
 
+// let meIcons = []
 async function obtainFederatedProfilesInfo() {
     let result = await makeRequest("GET", serviceBaseUrl + "/service/federationProfiles")
     let decodedResult = JSON.parse(result)
@@ -76,10 +77,11 @@ async function obtainFederatedProfilesInfo() {
         let profileTipCid = decodedResult[profileId]
         console.log(`${profileId} -> ${profileTipCid}`)
         let obtainer = function(xProfileId, xProfileCid) {
-            getCidContentsByCat(xProfileCid, true).then(function(profileJson){
-                console.log(`GOT ${xProfileId} -> ${xProfileCid} -> ${profileJson}`)
+            getCidContentsStringByCat(xProfileCid, true).then(function(profileJson){
+                // console.log(`GOT ${xProfileId} -> ${xProfileCid} ->`, profileJson)
                 let profileData = JSON.parse(profileJson)
                 let ptag = document.createElement("p")
+                ptag.innerHTML = jdenticon.toSvg(profileId, 20);
                 ptag.classList.add("collapsed")
                 let atag = makeATag("&#x1f465;", function (profileId) {
                     return async function () {
@@ -92,16 +94,20 @@ async function obtainFederatedProfilesInfo() {
                         return false;
                     }
                 }(xProfileId), true)
-                ptag.appendChild(atag)
+
                 ptag.appendChild(document.createTextNode(profileNametag(profileData)))
+                ptag.appendChild(atag)
 
                 outputEl.appendChild(ptag)
+
                 setTimeout(function(){
+                    ptag.querySelector("svg").classList.add("smallicon")
                     ptag.classList.remove("collapsed")
                     ptag.classList.add("expanded")
                 }, 100)
                 // TODO can put something good into the dom here now
             }).catch(function(e){
+                console.log(e)
                 console.log(`GOT ${xProfileId} -> ${xProfileCid} -> NODATA`)
             })
         }
@@ -283,7 +289,7 @@ async function fetchCheckProfile(profileId, profileCid, pubkeyb64) {
     if (!profileJson) {
         throw new Error("fetchCheckProfile No profile Json could be obtained for profile " + profileCid)
     }
-    console.log("here2")
+    // console.log("here2 obtained profileJson like: ", profileJson)
 
     let profileData = JSON.parse(profileJson)
     if (profileData["Id"] != profileId) {
