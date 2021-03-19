@@ -516,7 +516,7 @@ function fixMissingTsItemsRelatedTo(profileId, foundTs) {
         gnode.jsDate = jsDate
 
         if (!removedFromDom) {
-            return
+            continue
         }
         //  jam it back in, if we popped it out while we fixed it up.
         //  now, i would LIKE to update the text that is displayed in the date lines for the rows we just jammed back in but we dont have a reference for just that bit.
