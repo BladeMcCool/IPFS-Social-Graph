@@ -46,6 +46,30 @@ async function getCidContentsByCat(cid, bubbleError) {
     return arrayBufferToString(uint8ArrayConcat(chunks))
 }
 
+async function getCidContentsStringByCat(cid, bubbleError) {
+    let chunknum = 0
+    let catopts = {
+        timeout: 45000
+    }
+    let data = ""
+    try {
+        for await (const chunk of ipfs.cat(cid, catopts)) {
+            chunknum++
+            data += chunk.toString()
+        }
+    } catch(e) {
+        if (e.message == 'request timed out') {
+            if (bubbleError) {
+                throw e
+            }
+            console.log("getCidContentsStringByCat timeout trying to get ", cid)
+        } else {
+            console.log("getCidContentsStringByCat error: ", e)
+        }
+    }
+    return data
+}
+
 async function getCidContentsByGet(cid) {
     for await (const file of ipfs.get(cid)) {
         console.log(file.type, file.path)

@@ -336,7 +336,7 @@ async function fillPostPreviewInfo(gnode) {
             gnode.PreviewText = "[RETRACTED]"
         } else {
             try {
-                gnode.PreviewText = await getCidContentsByCat(gnode.post.Cid, true)
+                gnode.PreviewText = await getCidContentsStringByCat(gnode.post.Cid, true)
             } catch (e) {
                 if (e.message == 'request timed out') {
                     gnode.PreviewText = `[timed out getting ${gnode.post.Cid}]`
@@ -381,7 +381,7 @@ async function fillRepostPreviewInfo(gnode) {
             if (repostGn.post.MimeType != "text/plain") {
                 repostText = "[unsupported mimetype]"
             } else {
-                repostText = await getCidContentsByCat(repostGn.post.Cid, true)
+                repostText = await getCidContentsStringByCat(repostGn.post.Cid, true)
             }
             gnode.RepostPreviewText = repostText
         }
