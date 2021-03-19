@@ -82,6 +82,7 @@ async function obtainFederatedProfilesInfo() {
                 let profileData = JSON.parse(profileJson)
                 let ptag = document.createElement("p")
                 ptag.innerHTML = jdenticon.toSvg(profileId, 20);
+                ptag.querySelector("svg").classList.add("smallicon")
                 ptag.classList.add("collapsed")
                 let atag = makeATag("&#x1f465;", function (profileId) {
                     return async function () {
@@ -101,7 +102,6 @@ async function obtainFederatedProfilesInfo() {
                 outputEl.appendChild(ptag)
 
                 setTimeout(function(){
-                    ptag.querySelector("svg").classList.add("smallicon")
                     ptag.classList.remove("collapsed")
                     ptag.classList.add("expanded")
                 }, 100)
