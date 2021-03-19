@@ -839,6 +839,7 @@ func (tl *Timeline)  checkProfileSignature(profile *Profile, pubkey *rsa.PublicK
 	signature := profile.Signature
 	profile.Signature = nil
 	serializedProfile, err := json.Marshal(profile)
+	//log.Printf("checkProfileSignature dbg check sig json w/o sig looks like: %#v", string(serializedProfile))
 	profile.Signature = signature //put it back so that we dont wreck the data structure.
 	if err != nil {
 		fmt.Println("could not verify signature: ", err)

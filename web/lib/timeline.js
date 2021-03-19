@@ -279,7 +279,7 @@ async function fetchCheckProfile(profileId, profileCid, pubkeyb64) {
     }
 
     console.log("fetchCheckProfile here1")
-    let profileJson = await getCidContentsByCat(profileCid)
+    let profileJson = await getCidContentsStringByCat(profileCid)
     if (!profileJson) {
         throw new Error("fetchCheckProfile No profile Json could be obtained for profile " + profileCid)
     }

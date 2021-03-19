@@ -18,7 +18,8 @@ function generateKey() {
 async function getSignature(privkeyb64, data) {
     privkeyArrayBuffer = base64StringToArrayBuffer(privkeyb64)
     console.log("got this many bytes of pk decoded array buffer:", privkeyArrayBuffer.byteLength)
-    dataToSign = stringToArrayBuffer(data)
+    // dataToSign = stringToArrayBuffer(data)
+    dataToSign = new Uint8Array(data.toByteArray())
     console.log("got this many bytes of input, and after convert to arraybuffer for sig it is this long", data.length, dataToSign.byteLength)
     privkeyreused = await crypto.subtle.importKey("pkcs8", privkeyArrayBuffer, signAlgorithm, true, ["sign"])
     siggy = await window.crypto.subtle.sign(signAlgorithm, privkeyreused, dataToSign)
@@ -60,7 +61,7 @@ async function verifyProfileSig(data, pubkey) {
     let sigBytes = base64StringToArrayBuffer(sigb64)
     try {
         // console.log(sigBytes, dataToVerify)
-        verified = await crypto.subtle.verify(signAlgorithm, pubkey, sigBytes, stringToArrayBuffer(dataToVerify));
+        verified = await crypto.subtle.verify(signAlgorithm, pubkey, sigBytes, new Uint8Array(dataToVerify.toByteArray()));
     } catch(e) {
         console.log("verifySig got verify err", e)
     }
@@ -82,7 +83,7 @@ async function verifyGraphNodeSig(data, pubkey) {
     let sigBytes = base64StringToArrayBuffer(sigb64)
     try {
         // console.log(sigBytes, dataToVerify)
-        verified = await crypto.subtle.verify(signAlgorithm, pubkey, sigBytes, stringToArrayBuffer(dataToVerify));
+        verified = await crypto.subtle.verify(signAlgorithm, pubkey, sigBytes, new Uint8Array(dataToVerify.toByteArray()));
     } catch(e) {
         console.log("verifySig got verify err", e)
     }
@@ -90,7 +91,8 @@ async function verifyGraphNodeSig(data, pubkey) {
 
 }
 
-
+//http://www.thesharepoint.nl/pb/javascript/utf-16-string-tobytearray-in-javascript/
+String.prototype.toByteArray=String.prototype.toByteArray||(function(e){for(var b=[],c=0,f=this.length;c<f;c++){var a=this.charCodeAt(c);if(55296<=a&&57343>=a&&c+1<f&&!(a&1024)){var d=this.charCodeAt(c+1);55296<=d&&57343>=d&&d&1024&&(a=65536+(a-55296<<10)+(d-56320),c++)}128>a?b.push(a):2048>a?b.push(192|a>>6,128|a&63):65536>a?(55296<=a&&57343>=a&&(a=e?65534:65533),b.push(224|a>>12,128|a>>6&63,128|a&63)):1114111<a?b.push(239,191,191^(e?1:2)):b.push(240|a>>18,128|a>>12&63,128|a>>6&63,128|a&63)}return b})
 
 function stringToArrayBuffer(byteStr) {
     var bytes = new Uint8Array(byteStr.length)
