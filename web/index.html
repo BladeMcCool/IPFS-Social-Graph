@@ -17,32 +17,52 @@
   <script src="./lib/timeline.js"></script>
   <style>
     .wrapper {
+      /*border: 2px solid red;*/
       display: grid;
-      grid-template-columns: 50px auto;
+      height: 100%;
+      /*overflow-y: hidden;*/
+      /*grid-template-columns: 50px auto;*/
+      grid-template-rows: 50px 1fr;
       /*grid-template-columns: 50px minmax(0, 1fr);*/
       /*grid-template-rows: 50px;*/
+      /*overflow-y: hidden*/
     }
-    div.wrapper  { border: 0px solid black; }
+    /*div.wrapper  { border: 0px solid black; }*/
     /*.wrapper .hamburgers {*/
     /*    grid-row-start: 1;*/
     /*    grid-row-end: 3;*/
     /*}*/
-    div.hamburgers { background-color: gray; color: lightgray }
-
+    div.hamburgers { background-color: gray; color: lightgray; padding-right: 10px; }
+    /*.tlentry div {border: 0px solid red; }*/
     .tlentry {
       /*border: 10px solid black;*/
       display: grid;
       /*grid-template-columns: 50px auto;*/
       grid-template-columns: 50px minmax(0, 1fr);
-      /*grid-template-rows: 100px auto;*/
+      grid-template-rows: auto auto;
       margin-bottom: 0px;
       padding-bottom: 0px;
       /*grid-template-rows: 10% 80% 10%;*/
     }
-    #rightpane { padding-left: 7px;  }
+    #rightpane {
+      padding-left: 7px;
+      /*border: 5px solid pink;*/
+      /*max-height: 100%;*/
+      overflow: hidden
+    }
+    #menuthing {
+      height: 100%;
+      overflow-y: scroll;
+      border: 0px solid black;
+      font-size: 8px;
+    }
+    #menuthing p { font-size: 10px; }
     .tlentry .tallboy {
       grid-row-start: 2;
-      grid-row-end: 7;
+      grid-row-end: 6;
+    }
+    .tlentry .replyrow {
+      grid-column: 1 / span 2;
     }
     .tlentry .repostnotespan {
       grid-column-start: 1;
@@ -56,17 +76,26 @@
     /*  text-decoration: none;*/
     /*  margin-right: 5px;*/
     /*}*/
+    .profilename p svg {
+      background-color: white;
+      padding: 2px;
+      /*border: 1px;*/
+      border-radius: 3px;
+      /*padding-top: px;*/
+      margin-right: 7px;
+    }
     .composearea {
+      margin-top: 7px;
       display: grid;
       /*grid-template-columns: minmax(0, 1fr) 50px;*/
       grid-template-columns: auto 50px;
-      grid-template-rows: 20px auto;
+      /*grid-template-rows: 20px auto;*/
     }
-    .composearea .profilename {
-      grid-column-start: 1;
-      grid-column-end: 3;
-    }
-    .composearea .profilename p { margin: 0px; }
+    /*.composearea .profilename {*/
+    /*    grid-column-start: 1;*/
+    /*    grid-column-end: 3;*/
+    /*}*/
+    /*.composearea .profilename p { margin: 0px; }*/
 
     .composearea div { border: 0px solid black; }
     .composearea input {
@@ -80,11 +109,30 @@
       margin-right: 7px;
     }
 
-    /*.mainuipane {*/
-    /*  display: grid;*/
-    /*  grid-template-rows: auto auto;*/
-    /*}*/
+    .mainuipane {
+      height: 100%;
+      display: grid;
+      grid-template-rows: 35px 1fr;
+      /*overflow-y: hidden;*/
+    }
+    div .tlcontainer {
+      margin-top: 7px;
+      /*border-top: 1px solid lightgray;*/
+      /*padding-top: 7px;*/
+      /*border: 2px solid orange;*/
+      /*max-height: 100vh;*/
+      overflow-y: scroll;
+    }
     /*.mainuipane { border: 10px solid orange }*/
+    body {
+      font-family: sans-serif;
+      font-size: 10pt;
+      margin: 0;
+      padding: 0;
+      /*overscroll-behavior: contain;*/
+      /*overflow-y: hidden;*/
+    }
+    a { text-decoration: none }
 
     div.tlentry { margin-right: 7px; }
     /*.tlentry  div { border: 0px solid green; }*/
@@ -202,13 +250,14 @@
       text-align: center;
     }
 
-    body {
-      font-family: sans-serif;
-      font-size: 10pt;
-      margin: 0;
-      padding: 0;
+    .menubutton {
+      text-align: center;
+      cursor:pointer;
+      float: right;
+      margin-left: 20px;
     }
-    a { text-decoration: none }
+
+
     /*reference because i will _never_ remember this.*/
     /*padding: <padding-top> || <padding-right> || <padding-bottom> || <padding-left>*/
   </style>
@@ -220,42 +269,44 @@
     function hideSpinner() {
       document.getElementById("spinnercontainer").style.display = "none"
     }
-    showSpinner()
+    // showSpinner()
   </script>
 </head>
 <body>
-  <div class="spinnercontainer" id="spinnercontainer" style="display: none">
+  <div class="spinnercontainer" id="spinnercontainer">
     <div class="lds-ring"><div></div><div></div><div></div><div></div></div>
   </div>
 
   <!-- shameless table layout in the year 2021 . i welcome the css layout PR. -->
   <div class="wrapper">
     <div class="hamburgers" style="text-align: center;">
-      <p onclick="menuswap()" style="text-align: center; cursor:pointer;">&#x2630;</p>
-      <p onclick="membersswap()" style="text-align: center; cursor:pointer;">&#x1F465;</p>
+      <p onclick="menuswap()" class="menubutton">☰</p>
+      <p onclick="membersswap()" class="menubutton">👥</p>
+      <div class="profilename" style="float:left; margin-left: 7px;"><p id="profilename"><svg class="smallicon"></svg> </p></div>
     </div>
     <div id="rightpane">
 
       <div id="mainuipane" class="mainuipane">
         <div id="mainthing" class="composearea">
-          <div class="profilename"><p id="profilename"><svg class="smallicon"></svg> </p></div>
-          <div style="padding: 4px 4px 10px 0px;"><input type="text" id="posttext" name="posttext"></div>
-          <div style="border: 0px solid pink; margin: 0px"><p style="font-size: 30px; margin: -5px 0px 0px 0px; cursor:pointer;" onclick="createProfilePost()" >&#x1f4e8;</p></div>
+          <div style=""><input style="height: 28px;" type="text" id="posttext" name="posttext"></div>
+          <div style="border: 0px solid pink; margin: 0px"><p style="font-size: 30px; margin: -5px 0px 0px 0px; cursor:pointer;" onclick="createProfilePost()">📨</p></div>
         </div>
-        <div id="tlcontainer">
+        <div class="tlcontainer" id="tlcontainer">
 
         </div>
       </div>
-      <div id="menuthing" style="display:none">
+      <div id="menuthing" style="display:none;">
 
         <table>
           <tr>
             <td valign="top" id="form">
+              <!--
               <p>
                 <button onclick="loadJsTimeline()">Js History</button>
                 <button onclick="loadServerHistory()">From-server History</button>
               </p>
               <hr>
+              -->
 
               <p>Display name:&nbsp;<input type="text" id="dispname" name="dispname"></p>
               <p>Bio:&nbsp;<input type="text" id="bio" name="bio"></p>
@@ -296,14 +347,14 @@
           <p>Public Key base64:&nbsp;<textarea id="pubkeyb64" name="pubkeyb64" disabled></textarea></p>
           <p>Private Key base64:&nbsp;<textarea id="privkeyb64" name="privkeyb64" disabled></textarea></p>
                 <!-- <p>Both keys, custom PEM format:&nbsp;<textarea id="pemishout" name="pemishout" disabled></textarea></p> -->
-          <p>Profile Id:&nbsp;<input type="text" id="profileid" name="profileid" size="50" disabled></p>
-          <p>Profile Tip:&nbsp;<input type="text" id="profiletip" name="profiletip" size="50" disabled></p>
-          <p>Graph Tip:&nbsp;<input type="text" id="graphtip" name="graphtip" size="50" disabled></p>
-          <p>IPNSDelegate&nbsp;<input type="text" id="ipnsdelegate" name="ipnsdelegate" size="50" disabled></p>
+          <p>Profile Id:&nbsp;<input type="text" id="profileid" name="profileid" size="30" disabled></p>
+          <p>Profile Tip:&nbsp;<input type="text" id="profiletip" name="profiletip" size="30" disabled></p>
+          <p>Graph Tip:&nbsp;<input type="text" id="graphtip" name="graphtip" size="30" disabled></p>
+          <p>IPNSDelegate&nbsp;<input type="text" id="ipnsdelegate" name="ipnsdelegate" size="30" disabled></p>
         </span>
               <hr>
               <!-- if you feel inspired to implement the stuff the server does in js using ipfs-js, i'd welcome a pr. ipns publish doesnt seem to work from the browser tho, which is kind of the primary motivation behind the server thing in the first place. -->
-              <p>Service Base Url :&nbsp;<input type="text" id="servicebaseurl" name="servicebaseurl" size="50" onblur="saveServiceBaseUrl()"></p>
+              <p>Service Base Url :&nbsp;<input type="text" id="servicebaseurl" name="servicebaseurl" size="30" onblur="saveServiceBaseUrl()"></p>
               <p><a href="https://github.com/BladeMcCool/IPFS-Social-Graph" target="_blank">Project Github</a></p>
             </td>
             <td valign="top">
@@ -341,7 +392,7 @@
         </div>
         <!-- follow: &#x1f465; reply: &#x1f5e8; repost: &#x1f504; unfollow: &#x274c; retract: &#x1f5d1; -->
         <div class="buttonarea"></div>
-        <div class="replyrow"></div>
+        <div class="replyrow" style="display: none;"></div>
       </div>
     </div>
 

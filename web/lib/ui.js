@@ -621,6 +621,7 @@ function prepareDomElements(gnode) {
     entryContainer.id = "entry" + Object.keys(gnReplyParents).length
     let replyRow = entryContainer.querySelector(".replyrow")
     replyRow.appendChild(gnode.domElements.replyContainer)
+    replyRow.style.display = ""
 }
 
 function replyBlaster(i, gnode, replyTo) {
