@@ -80,6 +80,7 @@ async function setIdentity(keyname) {
     mysmallIconSvg.setAttribute("data-jdenticon-value", identity["profileid"] ? identity["profileid"] : "")
     jdenticon.update(mysmallIconSvg)
     document.getElementById("profilename").childNodes[1].textContent = profileNametag({Id:identity["profileid"] ? identity["profileid"] : "", DisplayName: identity["dispname"] ? identity["dispname"] : ""})
+    resetSecretSauce()
 
     try {
         await localforage.setItem('selectedIdentity', keyname);
@@ -115,9 +116,10 @@ async function initIdentity() {
     // document.getElementById("dispname").value = name
     // document.getElementById("bio").value = bio
     await newIdentity(name, name, bio)
+    await promptToFollowCurated()
 }
 
-async function newIdentity(newidentname, dispname, bio) {
+async function newIdentity(newidentname, dispname, bio, promptToFollowCurated) {
     console.log('newIdentity: identities is: ', identities);
 
     keypair = await generateKey()
@@ -196,7 +198,7 @@ async function deleteSelectedIdentity() {
     removeSelectedIdentFromSelect(true)
     delete identities[removeIdentname]
     await updateSavedIdentites(identities)
-    await localforage.setItem('selectedIdentity', keyname)
+    await localforage.setItem('selectedIdentity', null)
     await unselectIdentity()
 }
 

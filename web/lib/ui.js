@@ -3,6 +3,7 @@ var selectedIdentity
 var importPubkey
 let selectedIdentityProfileId
 let timelineUpdaterInterval
+let superSecretModeEnabled = false
 
 let tlEntryTemplate
 
@@ -73,7 +74,7 @@ async function reloadSession() {
     await setIdentity(selectedIdentity)
 }
 
-async function createProfilePost() {
+async function createProfilePost(noconfirmFollow) {
     if (!selectedIdentity) {
         alert("select an identity first please")
         return false
@@ -116,15 +117,22 @@ async function createProfilePost() {
     sendprivkey = false // disabling this for now. ipns publish is way to slow and this is super insecure anyway.
 
     let confirmFields = {
-        "followprofileid":["follow", clearFollow],
+        // "followprofileid":["follow", clearFollow],
         "unfollowprofileid":["unfollow", clearUnfollow],
         "retractionofnodecid":["retract", clearRetraction],
     }
+
+    if (noconfirmFollow) {
+        clearFollow()
+    } else {
+        confirmFields["followprofileid"] = ["follow", clearFollow]
+    }
+
     for (var key of Object.keys(confirmFields)) {
-        clearFunc = confirmFields[key][1]
+        let clearFunc = confirmFields[key][1]
         clearFunc()
         if (inputFlds[key]) {
-            confirmText = confirmFields[key][0]
+            let confirmText = confirmFields[key][0]
             if (!confirm("really " + confirmText + " " + inputFlds[key] + "?")) {
                 return false
             }
@@ -369,10 +377,10 @@ function unfollow(profileId) {
     document.getElementById("unfollowprofileid").value = profileId
     createProfilePost()
 }
-function follow(profileId) {
+function follow(profileId, noconfirm) {
     //set the field and call the create post func.
     document.getElementById("followprofileid").value = profileId
-    return createProfilePost()
+    return createProfilePost(noconfirm)
 }
 function retract(cid) {
     document.getElementById("retractionofnodecid").value = cid
@@ -1338,6 +1346,11 @@ function clearUnlike() {
     document.getElementById("unlikeofnodecid").value = ""
 }
 
+function setSecretSauceEnabler() {
+    document.getElementById("profilename").childNodes[0].addEventListener("click", function(){
+        incrementSauce()
+    })
+}
 
 function setEnterButtonAction(){
     document.onkeydown = function (e) {
@@ -1384,9 +1397,12 @@ function membersswap() {
         document.getElementById("mainuipane").style.display="none"
         document.getElementById("memberspane").style.display=""
     } else {
+        resetSecretSauce()
         showMainScreen()
     }
-    obtainFederatedProfilesInfo().catch(()=>{})
+    obtainFederatedProfilesInfo().catch((e)=>{
+        console.log(e)
+    })
 }
 
 function clearReply() {
@@ -1501,6 +1517,7 @@ myOnload = async function() {
     tlEntryTemplate = document.getElementById("telentry_template").querySelector("div")
     await startIpfs()
     await reloadSession()
+    setSecretSauceEnabler()
     setEnterButtonAction()
     focusPostText()
     hideSpinner()

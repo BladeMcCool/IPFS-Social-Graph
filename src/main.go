@@ -12,6 +12,7 @@ func main() {
 	log.Printf("Starting IPFS Social Graph Server ...")
 	lister := &Lister{
 		BaseWlProfileIdList: getWlBaseProfileIdList(),
+		CuratedProfileIdList: getCuratedProfileIdList(),
 	}
 	service := &APIService{
 		TimeService:         &defaultTimeService{},
@@ -99,6 +100,15 @@ func getWlBaseProfileIdList() []string {
 		log.Printf("note: missing CIDDAG_WL_PROFILEIDS")
 		return []string{}
 		//os.Exit(1)
+	}
+	if val == "" { return nil }
+	return strings.Split(val, ",")
+}
+
+func getCuratedProfileIdList() []string {
+	val, ok := os.LookupEnv("CIDDAG_CURATED_PROFILEIDS")
+	if !ok {
+		return []string{}
 	}
 	if val == "" { return nil }
 	return strings.Split(val, ",")

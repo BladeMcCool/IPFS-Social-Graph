@@ -66,9 +66,27 @@ async function updateJsTimeline() {
     }
 }
 
+let secretSauceCounter = 0
+let secretSauceThreshold = 20
+function resetSecretSauce() {
+    secretSauceCounter = 0
+    superSecretModeEnabled = false
+}
+function incrementSauce() {
+    secretSauceCounter++
+    console.log("secretSauce ", secretSauceCounter)
+    if (secretSauceCounter >= secretSauceThreshold) {
+        superSecretModeEnabled = true
+    }
+}
 // let meIcons = []
 async function obtainFederatedProfilesInfo() {
-    let result = await makeRequest("GET", serviceBaseUrl + "/service/federationProfiles")
+    let obtainmentServerPath = serviceBaseUrl + "/service/curatedProfiles"
+    if (superSecretModeEnabled) {
+        //secret as much as someone cares to not review the source code to find this.
+        obtainmentServerPath = serviceBaseUrl + "/service/federationProfiles"
+    }
+    let result = await makeRequest("GET", obtainmentServerPath)
     let decodedResult = JSON.parse(result)
 
     ///TODO before calling this, show the empty area for this stuff to be put into
@@ -113,6 +131,27 @@ async function obtainFederatedProfilesInfo() {
             })
         }
         obtainer(profileId, profileTipCid)
+    }
+}
+
+async function promptToFollowCurated() {
+    let limit = 1
+    let curatedProfileInfoJson = await makeRequest("GET", serviceBaseUrl + `/service/curatedProfiles?limit=${limit}`)
+    let curatedProfileinfo = JSON.parse(curatedProfileInfoJson)
+    for (let profileId in curatedProfileinfo) {
+        let profileData
+        try {
+            profileData = await fetchCheckProfile(profileId, curatedProfileinfo[profileId])
+        } catch(e) {
+            console.log(e)
+        }
+        let confirmText = `Would you like to follow suggested profile ${profileId}?`
+        if (profileData) {
+            confirmText = `Would you like to follow suggested profile ${profileNametag(profileData)}?`
+        }
+        if (confirm(confirmText)) {
+            await follow(profileId, true)
+        }
     }
 }
 

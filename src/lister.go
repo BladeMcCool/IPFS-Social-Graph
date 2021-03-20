@@ -15,6 +15,7 @@ type  Lister struct {
 	BaseWlProfileIds    map[string]bool
 	WlProfileIdMutex    sync.RWMutex
 	BaseWlProfileIdList []string
+	CuratedProfileIdList []string
 }
 
 func (l *Lister) CheckWl(profileId string) bool {

@@ -14,6 +14,8 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"log"
 	"os"
+	"strconv"
+
 	//"sync"
 	"time"
 
@@ -103,6 +105,7 @@ func (s *APIService) getHttpHandler(useauthMiddleware bool) http.Handler {
 	authedRouter.HandleFunc("/IPNSDelegateName", s.IPNSDelegateName).Methods("GET", "POST")
 	authedRouter.HandleFunc("/IPNSDelegateNames", s.IPNSDelegateNames).Methods("GET", "POST")
 	authedRouter.HandleFunc("/federationProfiles", s.FederationProfiles).Methods("GET")
+	authedRouter.HandleFunc("/curatedProfiles", s.CuratedProfiles).Methods("GET")
 	authedRouter.HandleFunc("/history", s.history).Methods("POST")
 	authedRouter.HandleFunc("/profileBestTip", s.profileBestTip).Methods("POST")
 	authedRouter.HandleFunc("/profileBestTipCid", s.profileBestTipCid).Methods("POST")
@@ -696,7 +699,6 @@ func (s *APIService) IPNSDelegateName(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte(ipfsName))
 }
 func (s *APIService) IPNSDelegateNames(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
 	memberNames := []string{}
 	for _, memberName := range Federation.memberNames {
 		memberNames = append(memberNames, memberName)
@@ -715,19 +717,57 @@ func (s *APIService) IPNSDelegateNames(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
 	w.Write(namesJson)
 }
 
 func (s *APIService) FederationProfiles(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
 	profilesJson, err := Federation.GetAllJson()
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusOK)
 	w.Write(profilesJson)
 }
+
+func (s *APIService) CuratedProfiles(w http.ResponseWriter, r *http.Request) {
+	limitStr := r.URL.Query().Get("limit")
+	var limit = 0
+	var err error
+	if limitStr != "" {
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	curatedProfileTipInfo := map[string]string{}
+	for _, profileId := range s.Lister.CuratedProfileIdList {
+		bestTip := Federation.Get(profileId)
+		if bestTip == nil { continue }
+		curatedProfileTipInfo[profileId] = *bestTip
+		if limit > 0 && len(curatedProfileTipInfo) >= limit {
+			break
+		}
+	}
+	profilesJson, err := json.Marshal(curatedProfileTipInfo)
+
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(profilesJson)
+}
+
+
 
 
 func (s *APIService) peerId(w http.ResponseWriter, r *http.Request) {
