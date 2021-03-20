@@ -382,7 +382,7 @@ async function fillRepostPreviewInfo(gnode) {
         repostedCids[gnode.repost] = gnode //take the gnode so that if we have to redact stuff later we can check the repostGn is owned by the retractor and also find the repost preview to redact it.
         profilesOfInterest[repostGn.ProfileId] = gnode.reposteeProfile
         gnOfInterest[gnode.Cid] = gnode
-        gnOfInterestByProfileId[repostGn.ProfileId][gnode.cid] = gnode
+        // gnOfInterestByProfileId[repostGn.ProfileId][gnode.cid] = gnode
 
         if (checkForRetraction(gnode.repost, gnode.reposteeProfile.Id)) {
             gnode.RepostPreviewText = "[RETRACTED]"
