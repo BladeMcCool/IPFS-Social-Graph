@@ -76,6 +76,15 @@
     /*  text-decoration: none;*/
     /*  margin-right: 5px;*/
     /*}*/
+    .stdpostinfo { font-size: 10px; font-weight: bold; padding-top: 3px; }
+    .stdpostinfo .tsspan { font-weight: normal;}
+    .stdpostcontent { font-size: 16px; padding-top: 2px; padding-bottom: 4px; overflow-wrap: break-word;  }
+    .repostnotespan { font-size: 10px; font-weight: bold; padding-top: 3px; }
+    .repostnotespan .tsspan { font-weight: normal;}
+    .repostcontainer span { font-size: 10px; font-weight: bold; }
+    .repostcontainer { overflow-wrap: break-word; }
+    .reposteets { font-size: 10px; font-weight: normal; }
+
     .profilename p svg {
       background-color: white;
       padding: 2px;
@@ -84,6 +93,15 @@
       /*padding-top: px;*/
       margin-right: 7px;
     }
+    .iteractionbuttons span svg {
+      background-color: white;
+      padding: 2px;
+      /*border: 1px;*/
+      border-radius: 2px;
+      /*padding-top: px;*/
+      margin-right: 4px;
+    }
+
     .composearea {
       margin-top: 7px;
       display: grid;
@@ -122,6 +140,7 @@
       /*border: 2px solid orange;*/
       /*max-height: 100vh;*/
       overflow-y: scroll;
+      overflow-x: hidden;
     }
     /*.mainuipane { border: 10px solid orange }*/
     body {
@@ -138,6 +157,7 @@
     /*.tlentry  div { border: 0px solid green; }*/
     .tlentry svg.bigicon { width: 50px; height: 50px; }
     svg.smallicon { vertical-align: middle; display: inline-block; width:20px; height: 20px; border: 0px solid black; margin: auto; }
+    svg.smallericon { vertical-align: middle; display: inline-block; width:15px; height: 15px; border: 0px solid black; margin: auto; }
 
     .collapsed {
       /*border: 2px solid blue;*/
@@ -256,7 +276,15 @@
       float: right;
       margin-left: 20px;
     }
-
+    .iteractionbuttons {
+      text-align: center;
+      float: right;
+      margin-right: 50px; font-size: 10px; padding-top: 8px;
+    }
+    .iteractionbuttons span.btn {
+      margin-right: 5px;
+      cursor:pointer;
+    }
 
     /*reference because i will _never_ remember this.*/
     /*padding: <padding-top> || <padding-right> || <padding-bottom> || <padding-left>*/
@@ -280,15 +308,16 @@
   <!-- shameless table layout in the year 2021 . i welcome the css layout PR. -->
   <div class="wrapper">
     <div class="hamburgers" style="text-align: center;">
-      <p onclick="menuswap()" class="menubutton">☰</p>
-      <p onclick="membersswap()" class="menubutton">👥</p>
       <div class="profilename" style="float:left; margin-left: 7px;"><p id="profilename"><svg class="smallicon"></svg> </p></div>
+      <p onclick="menuswap()" class="menubutton">&#x2630;</p>
+      <p onclick="membersswap()" class="menubutton">&#x1f465;</p>
+      <p class="iteractionbuttons" style=""><span class="btn" style="display: none" id="replyingicon" onclick="clearReplyAndFocus()">&#x1f5e8;</span><span class="btn" style="display: none" id="repostingicon" onclick="clearRepostAndFocus()">&#x1f504;</span><span id="interactwith" style="cursor: default"></span></p>
     </div>
     <div id="rightpane">
 
       <div id="mainuipane" class="mainuipane">
         <div id="mainthing" class="composearea">
-          <div style=""><input style="height: 28px;" type="text" id="posttext" name="posttext"></div>
+          <div style=""><input style="height: 28px;" type="text" id="posttext" name="posttext" onblur="notposting()" onfocus="setpostingStatus()"></div>
           <div style="border: 0px solid pink; margin: 0px"><p style="font-size: 30px; margin: -5px 0px 0px 0px; cursor:pointer;" onclick="createProfilePost()">📨</p></div>
         </div>
         <div class="tlcontainer" id="tlcontainer">

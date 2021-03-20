@@ -22,6 +22,7 @@ async function loadJsTimeline() {
     try {
         profileData = await fetchCheckProfile(identity["profileid"], identity["profiletip"], identity["pub"])
         // identities[selectedIdentity].profileData = profileData
+        profilesOfInterest[identity["profileid"]] = profileData
         console.log("profileData", profileData, "identity", identity)
     } catch(e) {
         console.log("load history got error from fetchCheckProfile:", e)
@@ -379,6 +380,9 @@ async function fillRepostPreviewInfo(gnode) {
         gnode.reposteeProfile = reposteeProfile
 
         repostedCids[gnode.repost] = gnode //take the gnode so that if we have to redact stuff later we can check the repostGn is owned by the retractor and also find the repost preview to redact it.
+        profilesOfInterest[repostGn.ProfileId] = gnode.reposteeProfile
+        gnOfInterest[gnode.Cid] = gnode
+        gnOfInterestByProfileId[repostGn.ProfileId][gnode.cid] = gnode
 
         if (checkForRetraction(gnode.repost, gnode.reposteeProfile.Id)) {
             gnode.RepostPreviewText = "[RETRACTED]"
@@ -504,6 +508,7 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
         // currentGn.Date = "0001-01-01T00:00:00Z" //maybe everything should have one tho.
         history.push(currentGn)
         gnOfInterestByProfileId[currentGn.ProfileId][currentGn.Cid] = currentGn
+        gnOfInterest[currentGn.Cid] = currentGn
         // let isKnownCid = knownCidsByProfile[profile["Id"]][currentGn.Cid] ? true : false
         // if (profileTipCache[profile["Id"]] && !isKnownCid) {
         //     console.log(`fetchGraphNodeHistory saw presumanbly new, unknown gn cid ${currentGn.Cid} in history of profile ${profile.Id}`)
@@ -575,6 +580,7 @@ async function getFolloweeProfileInfo(profileId) {
     try {
         followeeProfile = await fetchCheckProfile(profileId)
         followeeProfiles[profileId] = followeeProfile
+        profilesOfInterest[profileId] = followeeProfile
         console.log("getFillFolloweeHistory followeeProfile", followeeProfile)
     } catch(e) {
         console.log("getFillFolloweeHistory got error from fetchCheckProfile:", e)

@@ -17,6 +17,8 @@ let followButtons = {}
 let noTsGnodes = {}
 let profileTipCache = {}
 let gnOfInterestByProfileId = {}
+let gnOfInterest = {}
+let profilesOfInterest = {}
 
 function resetTextTimelineArea() {
     let target = document.getElementById("tlcontainer")
@@ -771,6 +773,7 @@ function addPostPTag(gnode, gnodeDomElements) {
     gnodeDomElements.replyButton = makeATag("&#x1f5e8;", function (cid) {
         return function () {
             document.getElementById("inreplyto").value = cid
+            clearUnmatchedRepost()
             focusPostText()
             return false;
         }
@@ -783,6 +786,7 @@ function addPostPTag(gnode, gnodeDomElements) {
     gnodeDomElements.repostButton = makeATag("&#x1f504;", function (cid) {
         return function () {
             document.getElementById("repostofnodecid").value = cid
+            clearUnmatchedReply()
             focusPostText()
             return false;
         }
@@ -822,8 +826,9 @@ function addPostPTag(gnode, gnodeDomElements) {
 
         let stdPostInfoDiv = gnodeDomElements.container.querySelector(".stdpostinfo")
         stdPostInfoDiv.appendChild(posterInfoTextnode)
-        stdPostInfoDiv.appendChild(document.createTextNode(" - "))
-        stdPostInfoDiv.appendChild(gnodeDomElements.tsTextnode)
+        // stdPostInfoDiv.appendChild(document.createTextNode(" - "))
+        let tsSpan = getTsSpan(gnodeDomElements)
+        stdPostInfoDiv.appendChild(tsSpan)
         if (gnodeDomElements.unfollowButton) {
             stdPostInfoDiv.appendChild(gnodeDomElements.unfollowButton)
         }
@@ -835,6 +840,13 @@ function addPostPTag(gnode, gnodeDomElements) {
     // gnodeDomElements.container.appendChild(ptag)
 }
 
+function getTsSpan(gnodeDomElements) {
+    let tsSpan = document.createElement("span")
+    tsSpan.classList.add("tsspan")
+    tsSpan.appendChild(document.createTextNode(" - "))
+    tsSpan.appendChild(gnodeDomElements.tsTextnode)
+    return tsSpan
+}
 function addRePostPTag(gnode, gnodeDomElements) {
     if (!gnode["repost"]) {
         return null
@@ -871,8 +883,8 @@ function addRePostPTag(gnode, gnodeDomElements) {
         reposterInfoP.appendChild(gnodeDomElements.posterInfoTextnode)
         let reposterTsP = gnodeDomElements.container.querySelector(".reposterts")
 
-        reposterTsP.appendChild(document.createTextNode(" reposted - "))
-        reposterTsP.appendChild(gnodeDomElements.tsTextnode)
+        reposterTsP.appendChild(document.createTextNode(" reposted"))
+        reposterTsP.appendChild(getTsSpan(gnodeDomElements))
         if (gnodeDomElements.unfollowButton) {
             reposterTsP.appendChild(gnodeDomElements.unfollowButton)
         }
@@ -1054,8 +1066,10 @@ function getNodePosterInfoText(gnode) {
 }
 function profileNametag(profileData) {
     let ProfileId = profileData.Id
-    let shortinfo = ProfileId.substring(ProfileId.length - 5)
-    return `@${profileData.DisplayName} (${shortinfo})`
+    // let shortinfo = ProfileId.substring(ProfileId.length - 5)
+    // return `@${profileData.DisplayName} (${shortinfo})`
+    // let shortinfo = ProfileId.substring(ProfileId.length - 5)
+    return `@${profileData.DisplayName}`
 }
 
 function getNoPostPreviewText(gnode) {
@@ -1307,9 +1321,6 @@ function focusPostText() {
 function clearIdentName() {
     document.getElementById("newidentname").value = ""
 }
-function clearReply() {
-    document.getElementById("inreplyto").value = ""
-}
 function clearFollow() {
     document.getElementById("followprofileid").value = ""
 }
@@ -1319,9 +1330,6 @@ function clearUnfollow() {
 }
 function clearRetraction() {
     document.getElementById("retractionofnodecid").value = ""
-}
-function clearRepost() {
-    document.getElementById("repostofnodecid").value = ""
 }
 function clearLike() {
     document.getElementById("likeofnodecid").value = ""
@@ -1381,7 +1389,100 @@ function membersswap() {
     obtainFederatedProfilesInfo().catch(()=>{})
 }
 
+function clearReply() {
+    document.getElementById("inreplyto").value = ""
+    document.getElementById("replyingicon").style.display = "none";
+    if (document.getElementById("repostofnodecid").value === "") {
+        document.getElementById("interactwith").innerHTML = ""
+    }
+}
+function clearUnmatchedReply() {
+    if (document.getElementById("inreplyto").value != "" && document.getElementById("repostofnodecid").value != document.getElementById("inreplyto").value) {
+        document.getElementById("inreplyto").value = ""
+    }
+    setpostingStatus()
+}
+function clearUnmatchedRepost() {
+    if (document.getElementById("repostofnodecid").value != "" && document.getElementById("repostofnodecid").value != document.getElementById("inreplyto").value) {
+        document.getElementById("repostofnodecid").value = ""
+    }
+    setpostingStatus()
+}
 
+function profileIdByGnodeCid(cid) {
+    let gnode = gnOfInterest[cid]
+    if (!gnode) { return null }
+
+    return gnode.ProfileId
+}
+
+function clearRepost() {
+    document.getElementById("repostofnodecid").value = ""
+    document.getElementById("repostingicon").style.display = "none";
+    if (document.getElementById("inreplyto").value === "") {
+        document.getElementById("interactwith").innerHTML = ""
+    }
+}
+
+function clearRepostAndFocus() {
+    clearRepost()
+    focusPostText()
+}
+function clearReplyAndFocus() {
+    clearReply()
+    focusPostText()
+}
+
+function getInteracteeProfileId() {
+    let interacteeProfileId = profileIdByGnodeCid(document.getElementById("inreplyto").value)
+    if (!interacteeProfileId) {
+        interacteeProfileId = profileIdByGnodeCid(document.getElementById("repostofnodecid").value)
+    }
+    return interacteeProfileId
+}
+function getInteracteeName() {
+    let interacteeProfileId = getInteracteeProfileId()
+    //currently maybe only can do followees?
+    if (!profilesOfInterest[interacteeProfileId]) {
+        return "[UNOBTAINABLE]"
+    }
+    return profileNametag(profilesOfInterest[interacteeProfileId])
+}
+function notposting() {
+    //i think we should just clear the icons if we are not in the field.
+    // document.getElementById("replyingicon").style.display = "none";
+    // document.getElementById("repostingicon").style.display = "none";
+    // document.getElementById("interactwith").innerHTML = ""
+}
+
+function setpostingStatus() {
+    //if there is a reply happening, show the reply icon
+    //if there is a repost happening, show the repost icon
+    //otherwise show no icons.
+    let showInteracteeName = false
+    if (document.getElementById("repostofnodecid").value != "") {
+        document.getElementById("repostingicon").style.display = "";
+        showInteracteeName = true
+    } else {
+        document.getElementById("repostingicon").style.display = "none"
+    }
+    if (document.getElementById("inreplyto").value != "") {
+        document.getElementById("replyingicon").style.display = "";
+        showInteracteeName = true
+    } else {
+        document.getElementById("replyingicon").style.display = "none";
+    }
+    //i think we should just clear the icons if we are not in the field.
+    if (showInteracteeName) {
+        let interactWithInfo = document.getElementById("interactwith")
+        interactWithInfo.innerHTML = jdenticon.toSvg(getInteracteeProfileId(), 15);
+        interactWithInfo.querySelector("svg").classList.add("smallericon")
+        interactWithInfo.appendChild(document.createTextNode(getInteracteeName()))
+    }
+
+
+
+}
 
 function toggle(thing) {
     thing = document.getElementById(`entry${thing}`)
@@ -1395,8 +1496,9 @@ function toggle(thing) {
 myOnload = async function() {
     // console.log("DEBUGGGGGGGG do naaathin")
     // return
-    tlEntryTemplate = document.getElementById("telentry_template").querySelector("div")
 
+
+    tlEntryTemplate = document.getElementById("telentry_template").querySelector("div")
     await startIpfs()
     await reloadSession()
     setEnterButtonAction()
