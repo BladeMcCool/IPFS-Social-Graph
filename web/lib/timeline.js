@@ -49,6 +49,7 @@ async function updateJsTimeline() {
     let profileData
     try {
         profileData = await fetchCheckProfile(identity["profileid"], identity["profiletip"], identity["pub"])
+        profilesOfInterest[identity["profileid"]] = profileData
         // identities[selectedIdentity].profileData = profileData
         console.log("updateJsTimeline got profileData", profileData, "identity", identity)
     } catch(e) {
