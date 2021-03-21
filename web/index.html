@@ -32,7 +32,6 @@
     /*    grid-row-start: 1;*/
     /*    grid-row-end: 3;*/
     /*}*/
-    div.hamburgers { background-color: gray; color: lightgray; padding-right: 10px; }
     /*.tlentry div {border: 0px solid red; }*/
     .tlentry {
       /*border: 10px solid black;*/
@@ -88,6 +87,15 @@
     .repostcontainer { overflow-wrap: break-word; }
     .reposteets { font-size: 10px; font-weight: normal; }
 
+    div.hamburgers {
+      background-color: gray;
+      color: lightgray;
+      padding-right: 10px;
+      /*width: 100%;*/
+    }
+    /*.hamburgers div { border: 1px solid red; }*/
+    /*.hamburgers p { border: 1px solid red; }*/
+
     .profilename p svg {
       background-color: white;
       padding: 2px;
@@ -96,6 +104,26 @@
       /*padding-top: px;*/
       margin-right: 7px;
     }
+    div.profilename {
+      max-width: 50vw;
+      overflow-x: hidden;
+      white-space: nowrap;
+    }
+
+    .iteractionbuttons {
+      text-align: center;
+      float: right;
+      font-size: 10px;
+      padding-top: 5px;
+      max-width: 24vw;
+      overflow-x: hidden;
+      white-space: nowrap;
+    }
+    .iteractionbuttons span.btn {
+      margin-right: 5px;
+      cursor:pointer;
+    }
+
     .iteractionbuttons span svg {
       background-color: white;
       padding: 2px;
@@ -105,6 +133,13 @@
       margin-right: 4px;
     }
 
+    .menubutton {
+      text-align: center;
+      cursor:pointer;
+      float: right;
+      margin-left: 20px;
+    }
+
     .composearea {
       margin-top: 7px;
       display: grid;
@@ -112,11 +147,6 @@
       grid-template-columns: auto 50px;
       /*grid-template-rows: 20px auto;*/
     }
-    /*.composearea .profilename {*/
-    /*    grid-column-start: 1;*/
-    /*    grid-column-end: 3;*/
-    /*}*/
-    /*.composearea .profilename p { margin: 0px; }*/
 
     .composearea div { border: 0px solid black; }
     .composearea input {
@@ -136,6 +166,7 @@
       grid-template-rows: 35px 1fr;
       /*overflow-y: hidden;*/
     }
+
     div .tlcontainer {
       margin-top: 7px;
       /*border-top: 1px solid lightgray;*/
@@ -271,22 +302,6 @@
       left: 0;
       right: 0;
       text-align: center;
-    }
-
-    .menubutton {
-      text-align: center;
-      cursor:pointer;
-      float: right;
-      margin-left: 20px;
-    }
-    .iteractionbuttons {
-      text-align: center;
-      float: right;
-      margin-right: 50px; font-size: 10px; padding-top: 8px;
-    }
-    .iteractionbuttons span.btn {
-      margin-right: 5px;
-      cursor:pointer;
     }
 
     /*reference because i will _never_ remember this.*/
