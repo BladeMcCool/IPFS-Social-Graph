@@ -67,7 +67,7 @@ async function updateJsTimeline() {
 }
 
 let secretSauceCounter = 0
-let secretSauceThreshold = 20
+let secretSauceThreshold = 7
 function resetSecretSauce() {
     secretSauceCounter = 0
     superSecretModeEnabled = false
@@ -79,8 +79,14 @@ function incrementSauce() {
         superSecretModeEnabled = true
     }
 }
+
 // let meIcons = []
+let loadingProfilesInfo = false
 async function obtainFederatedProfilesInfo() {
+    if (loadingProfilesInfo) { return }
+    loadingProfilesInfo = true
+    // superSecretModeEnabled = true;
+    let profilesList = []
     let obtainmentServerPath = serviceBaseUrl + "/service/curatedProfiles"
     if (superSecretModeEnabled) {
         //secret as much as someone cares to not review the source code to find this.
@@ -91,6 +97,27 @@ async function obtainFederatedProfilesInfo() {
 
     ///TODO before calling this, show the empty area for this stuff to be put into
     let outputEl = document.getElementById("memberspane")
+
+    let insertFunc = function(i, profileData) {
+        let existingChildren = outputEl.childNodes
+        if (i == outputEl.childNodes.length) {
+            outputEl.appendChild(profileData.domElement);
+        } else {
+            //new one becomes the new element i of the children ... meaning add it before existing element i
+            console.log(`blast into list and become elem ${i}`)
+            let siblingOfNew = existingChildren[i]
+            if (!siblingOfNew) {
+                //debuggin since this shouldnt happen lol.
+                console.log("NO SIBLING??")
+            }
+            let siblingParent = siblingOfNew.parentNode
+            siblingParent.insertBefore(profileData.domElement, siblingOfNew);
+        }
+    }
+    let compareFunc = (a, b) => {
+        return a.DisplayName.toLowerCase() > b.DisplayName.toLowerCase() ? 1 : -1
+    }
+
 
     for (let profileId of Object.keys(decodedResult)) {
         let profileTipCid = decodedResult[profileId]
@@ -118,7 +145,9 @@ async function obtainFederatedProfilesInfo() {
                 ptag.appendChild(document.createTextNode(profileNametag(profileData)))
                 ptag.appendChild(atag)
 
-                outputEl.appendChild(ptag)
+                // outputEl.appendChild(ptag)
+                profileData.domElement = ptag
+                xbinaryInsert(profilesList, profileData, compareFunc, insertFunc)
 
                 setTimeout(function(){
                     ptag.classList.remove("collapsed")
@@ -132,6 +161,7 @@ async function obtainFederatedProfilesInfo() {
         }
         obtainer(profileId, profileTipCid)
     }
+    loadingProfilesInfo = false
 }
 
 async function promptToFollowCurated() {
