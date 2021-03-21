@@ -375,11 +375,11 @@
               </p>
               <hr>
               <p>
-                <button onclick="newIdentity()">New Identity</button>&nbsp;
-                <input type="text" id="newidentname" name="newidentname">&nbsp;
                 <select name="chooseident" id="chooseident" onchange="chooseIdentity(this.value)">
                   <option value="">Choose ...</option>
                 </select>
+                <input type="text" id="newidentname" name="newidentname">&nbsp;
+                <button onclick="newIdentity()">New Identity</button>&nbsp;
                 <button onclick="deleteSelectedIdentity()">Delete Identity</button>&nbsp;
                 <button onclick="renameSelectedIdentity()">Rename Identity</button>&nbsp;
               </p>
@@ -405,6 +405,11 @@
               <!-- if you feel inspired to implement the stuff the server does in js using ipfs-js, i'd welcome a pr. ipns publish doesnt seem to work from the browser tho, which is kind of the primary motivation behind the server thing in the first place. -->
               <p>Service Base Url :&nbsp;<input type="text" id="servicebaseurl" name="servicebaseurl" size="30" onblur="saveServiceBaseUrl()"></p>
               <p><a href="https://github.com/BladeMcCool/IPFS-Social-Graph" target="_blank">Project Github</a></p>
+              <div id="federationmembers">
+                <div><p style="font-weight: bold">IPNS Delegate Federation name list:</p></div>
+                <div class="fednamelist"></div>
+              </div>
+
             </td>
             <td valign="top">
               <span id="timeline"></span>

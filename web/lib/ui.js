@@ -1378,14 +1378,35 @@ function isMainScreenShowing() {
     return false
 }
 
-function menuswap() {
+async function menuswap() {
     if (isMainScreenShowing()) {
         document.getElementById("mainuipane").style.display="none"
         document.getElementById("menuthing").style.display=""
+        await populateFederationMembers()
     } else {
         showMainScreen()
     }
 }
+
+async function populateFederationMembers() {
+    document.getElementById("federationmembers").style.display="none"
+
+    let namesJson = await IPNSDelegateNames()
+    if (!namesJson) { return }
+
+    let names = JSON.parse(namesJson)
+    let outElContainer = document.getElementById("federationmembers")
+    let outEl = outElContainer.querySelector("div.fednamelist")
+    outEl.textContent = ""
+    for (let i = 0; i < names.length; i++) {
+        let ptag = document.createElement("p")
+        ptag.appendChild(document.createTextNode(names[i]))
+        outEl.appendChild(ptag)
+    }
+
+    document.getElementById("federationmembers").style.display=""
+}
+
 
 function membersswap() {
     if (isMainScreenShowing()) {

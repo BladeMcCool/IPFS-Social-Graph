@@ -162,9 +162,15 @@ async function profileBestTipCid(profileId) {
 
 async function IPNSDelegateName() {
     console.log("IPNSDelegateName...")
-    result = await makeRequest("POST", serviceBaseUrl + "/service/IPNSDelegateName", null, true)
+    let result = await makeRequest("POST", serviceBaseUrl + "/service/IPNSDelegateName", null, true)
     return result
 }
+async function IPNSDelegateNames() {
+    console.log("IPNSDelegateNames...")
+    let result = await makeRequest("POST", serviceBaseUrl + "/service/IPNSDelegateNames", null, true)
+    return result
+}
+
 
 async function getRecaptchaSiteKey() {
     return await makeRequest("GET", serviceBaseUrl + "/recaptchaSiteKey")
