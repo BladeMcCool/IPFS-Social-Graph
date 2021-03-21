@@ -342,13 +342,11 @@ async function authedCheck(profileId, pubb64) {
     }
     //can't talk, try captcha
     let recaptchaSuccess = await loadRecaptchaScript(profileId)
-    if (!recaptchaSuccess) {
-        return false
-    }
-
-    //well thats great. that means we _should_ get a 200 or a 404 most likely.
-    if (await canTalk(profileId, pubb64)) {
-        return true
+    if (recaptchaSuccess) {
+        //well thats great. that means we _should_ get a 200 or a 404 most likely.
+        if (await canTalk(profileId, pubb64)) {
+            return true
+        }
     }
 
     alert("Failed auth check, won't be able to do much.")
