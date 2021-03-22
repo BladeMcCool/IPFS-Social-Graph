@@ -8,7 +8,7 @@ import (
 	//"context"
 	//"crypto/rsa"
 	//"crypto/x509"
-	"fmt"
+	//"fmt"
 	//shell "github.com/ipfs/go-ipfs-api"
 	//"log"
 	"time"
@@ -32,6 +32,7 @@ type GraphNode struct {
 	PublicUnlike []string `json:"publicunlike,omitempty"`
 
 	Signature []byte
+	Date *time.Time `json:",omitempty"`
 	// maybe the date belongs up in here
 	// also anyone could just lie about the date so maybe
 	// the concept of timestamp oracles could be used somehow
@@ -86,7 +87,7 @@ type HasherSigner interface {
 type Post struct {
 	MimeType string
 	Cid string
-	Date JSONTime
+	Date time.Time
 	Reply []string
 }
 
@@ -101,26 +102,27 @@ type Profile struct {
 	Previous *string //cid of previous version of the profile.
 	Signature []byte
 	IPNSDelegate *string `json:",omitempty"`
+	Date *time.Time `json:",omitempty"`
 }
 
-type JSONTime time.Time
-func (t *JSONTime)MarshalJSON() ([]byte, error) {
-	//do your serializing here
-	ts := time.Time(*t).Format(time.RFC3339)
-	stamp := fmt.Sprint(ts)
-	return []byte(`"` + stamp + `"`), nil
-}
-func (t *JSONTime)UnmarshalJSON(data []byte) error {
-	t1, err := time.Parse(
-		time.RFC3339,
-		string(data[1 : len(data)-1]), //lose the quotes first.
-	)
-	if err != nil {
-		return err
-	}
-	*t = JSONTime(t1)
-	return nil
-}
+//type JSONTime time.Time
+//func (t *JSONTime)MarshalJSON() ([]byte, error) {
+//	//do your serializing here
+//	ts := time.Time(*t).Format(time.RFC3339)
+//	stamp := fmt.Sprint(ts)
+//	return []byte(`"` + stamp + `"`), nil
+//}
+//func (t *JSONTime)UnmarshalJSON(data []byte) error {
+//	t1, err := time.Parse(
+//		time.RFC3339,
+//		string(data[1 : len(data)-1]), //lose the quotes first.
+//	)
+//	if err != nil {
+//		return err
+//	}
+//	*t = JSONTime(t1)
+//	return nil
+//}
 
 type Trashcan struct {
 	garbagePile *ttlcache.Cache

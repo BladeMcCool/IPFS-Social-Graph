@@ -375,18 +375,24 @@ func Test_encrypt_decrypt_sign_verify(t *testing.T) {
 }
 
 func Test_JSONTime(t *testing.T) {
-	stupid := Post{
+	timeWot := time.Now().UTC().Truncate(time.Second)
+	t.Logf("timewot: %#v", timeWot)
+	stupid := &Post{
 		MimeType: "x",
 		Cid:      "y",
-		Date:     JSONTime{},
+		Date:     timeWot,
 		Reply:    nil,
 	}
+	//stupider := &GraphNode{
+	//
+	//}
 	poopid, err := json.Marshal(stupid)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("%s\n\n", poopid)
 	t.Log("GOOD TO GO")
+	// 2021-03-22T17:11:39Z
 }
 
 func Test_make_profile(t *testing.T) {
@@ -407,6 +413,7 @@ func Test_make_profile(t *testing.T) {
 	fmt.Printf("the content cid is %s\n", cid)
 
 	//then we can create a graph node that references our content
+	ts := time.Now()
 	socialTip := GraphNode{
 		Version:   1,
 		Previous:  nil, //special case, this is the root node.
@@ -415,9 +422,10 @@ func Test_make_profile(t *testing.T) {
 		Post: &Post{
 			MimeType: "text/plain",
 			Cid: cid,
-			Date: JSONTime(time.Now()),
+			Date: ts,
 			Reply: nil,
 		},
+		Date: &ts,
 		PublicFollow: nil,
 	}
 	//_ = IPNSName
@@ -439,6 +447,7 @@ func Test_make_profile(t *testing.T) {
 		//IPNS:    IPNSName,
 		GraphTip: tipCid,
 		//Socials: nil,
+		Date: &ts,
 	}
 	profileJson, err := json.Marshal(profile)
 	checkError(err)
@@ -464,7 +473,7 @@ func Test_sign_and_verify_graphnode(t *testing.T) {
 	post := Post{
 		MimeType: "text/plain",
 		Cid: "abcdpotatoes",
-		Date: JSONTime(time.Now().UTC()),
+		Date: time.Now().UTC(),
 		Reply: nil,
 	}
 	tl := &Timeline{crypter: Crypter, ipfs: IPFS}
@@ -487,7 +496,8 @@ func Test_sign_and_verify_graphnode(t *testing.T) {
 func Test_sign_and_verify_profile(t *testing.T) {
 	//lets use one of the keys we made had IPFS make earlier (copied testKey3 to this local binary_rsa_privkey)
 	keyReadback, _ := Crypter.readBinaryIPFSRsaKey("test_key")
-	tl := &Timeline{crypter: Crypter, ipfs: IPFS}
+
+	tl := &Timeline{crypter: Crypter, ipfs: IPFS, timeService: &defaultTimeService{}}
 	profile := tl.createSignedProfile(
 		keyReadback,
 		"Alex Jones",
@@ -501,13 +511,13 @@ func Test_sign_and_verify_profile(t *testing.T) {
 }
 
 type testTimeService struct {
-	curTime JSONTime
+	curTime time.Time
 	incrementSec int64
 }
-func (ts *testTimeService) GetTime() JSONTime {
+func (ts *testTimeService) GetTime() time.Time {
 	reportedTime := ts.curTime
-	ts.curTime = JSONTime(time.Time(ts.curTime).Add(time.Second * time.Duration(ts.incrementSec)))
-	timestamp, _ := ts.curTime.MarshalJSON()
+	ts.curTime = time.Time(ts.curTime).Add(time.Second * time.Duration(ts.incrementSec))
+	timestamp, _ := json.Marshal(ts.curTime)
 	log.Printf("testTimeService GetTime: %s", timestamp)
 	return reportedTime
 }
@@ -520,7 +530,7 @@ func Test_create_and_read_back_chain_of_posts(t *testing.T) {
 }
 func createChainOfPosts(t *testing.T) []*TLProfile {
 	timeService := &testTimeService{
-		curTime: JSONTime(time.Now().UTC()),
+		curTime: time.Now().UTC().Truncate(time.Second),
 		incrementSec: 17,
 	}
 
@@ -894,7 +904,7 @@ func (mf *mockFederationMember) ResolveFetch() (map[string]string, error) {
 
 func Test_IPNSDelegateFederation(t *testing.T) {
 	timeService := &testTimeService{
-		curTime: JSONTime(time.Now().UTC()),
+		curTime: time.Now().UTC().Truncate(time.Second),
 		incrementSec: 17,
 	}
 
@@ -1035,7 +1045,7 @@ func TestIPNSDelegateSlam(t *testing.T) {
 	Federation.Init()
 
 	timeService := &testTimeService{
-		curTime: JSONTime(time.Now().UTC()),
+		curTime: time.Now().UTC().Truncate(time.Second),
 		incrementSec: 17,
 	}
 

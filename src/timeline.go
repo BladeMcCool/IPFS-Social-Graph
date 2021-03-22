@@ -47,11 +47,11 @@ type TLCreateProfileArgs struct {
 }
 
 type TimeService interface {
-	GetTime() JSONTime
+	GetTime() time.Time
 }
 type defaultTimeService struct {}
-func (dts *defaultTimeService) GetTime() JSONTime {
-	return JSONTime(time.Now().UTC())
+func (dts *defaultTimeService) GetTime() time.Time {
+	return time.Now().UTC().Truncate(time.Second)
 }
 
 type Timeline struct {
@@ -79,10 +79,12 @@ func CreateTimelineWithFirstTextPost(createArgs *TLCreateProfileArgs) (*Timeline
 }
 
 func (tl *Timeline) NewTLGraphNode() *TlGraphNode {
+	dateTs := tl.timeService.GetTime()
 	return &TlGraphNode{
 		GraphNode: &GraphNode{
 			Version: 1,
 			ProfileId: tl.profileId,
+			Date: &dateTs,
 		},
 		profile: tl.profile,
 	}
@@ -628,7 +630,7 @@ type HistoryMessage struct {
 	Cid string
 	Indent int
 	DisplayName string
-	Date JSONTime
+	Date time.Time
 	PreviewText string
 	RepostOf *GraphNode `json: "RepostOf,omitempty"`
 	Retracted bool  `json: ",omitempty"`
@@ -653,7 +655,7 @@ func (tl  *Timeline) generateTimeline() []*HistoryMessage {
 				Cid:         e.cid,
 				Indent:      0,
 				DisplayName: e.profile.DisplayName,
-				Date:        JSONTime{},
+				Date:        time.Time{},
 				PreviewText: e.PreviewText,
 			}
 			if e.Post != nil {
@@ -692,7 +694,7 @@ func (tl  *Timeline) generateTimeline() []*HistoryMessage {
 					//continue
 				}
 
-				followDate := JSONTime{} //by (bad?) design i'm not timestamping things that are not posts. that may be a mistake
+				followDate := time.Time{} //by (bad?) design i'm not timestamping things that are not posts. that may be a mistake
 				if e.GraphNode.Post != nil {
 					//if it comes along with a post though, we should be able to put a date on it.
 					followDate = e.GraphNode.Post.Date
@@ -856,6 +858,7 @@ func (tl *Timeline)  checkProfileSignature(profile *Profile, pubkey *rsa.PublicK
 
 func (tl *Timeline)  createSignedProfile(key *rsa.PrivateKey, displayName, bio, tip string, prev *string) *Profile {
 	pubKeyBytes, pubKeyHash := tl.calculateProfileId(&key.PublicKey)
+	dateTs := tl.timeService.GetTime()
 	profile := Profile{
 		Id:          pubKeyHash,
 		Pubkey:      pubKeyBytes,
@@ -863,6 +866,7 @@ func (tl *Timeline)  createSignedProfile(key *rsa.PrivateKey, displayName, bio, 
 		Bio:         bio,
 		GraphTip:    tip,
 		Previous:    prev,
+		Date:        &dateTs,
 	}
 	tl.signProfile(&profile, key)
 	return &profile

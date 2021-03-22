@@ -208,17 +208,17 @@ async function unsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, fo
         previous = null
     }
 
+    let ts = (new Date()).toISOString().split('.')[0]+"Z"
     graphNode = {
         ver:   1,
         ProfileId: profileId,
         previous: previous,
         Signature: null,
+        Date: ts,
     }
-
 
     if (text) {
         firstPostCid = await addContentsToIPFS(text)
-        let ts = (new Date()).toISOString().split('.')[0]+"Z"
         firstPost = {
             MimeType: "text/plain",
             Cid:      firstPostCid,
@@ -274,6 +274,7 @@ async function unsignedProfileWithFirstPost(pubkeyb64, UnsignedGraphNodeJson, Si
         Bio: Bio,
         Previous: previous,
         Signature: null,
+        Date: (new Date()).toISOString().split('.')[0]+"Z"
     }
     if (UseIPNSDelegate) {
         profile.IPNSDelegate = await IPNSDelegateName() //probably always gonna need server to provide this
@@ -671,6 +672,7 @@ const keyOrder = {
         Previous: 6,
         Signature: 7,
         IPNSDelegate: 8,
+        Date: 9,
     },
     GraphNode:{
         ver: 1,
@@ -684,6 +686,7 @@ const keyOrder = {
         publiclike: 9,
         publicunlike: 10,
         Signature: 11,
+        Date: 12,
 
         MimeType: 1,
         Cid: 2,
