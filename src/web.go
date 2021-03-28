@@ -202,7 +202,7 @@ func (s *APIService) getHistoryFollows(profileId string) []string {
 	}
 	err := tl.LoadProfile()
 	if err != nil {
-		log.Printf("getHistoryFollows loadProfile error: %s", err.Error())
+		log.Printf("getHistoryFollows loadProfile error for profileId %s: %s", profileId, err.Error())
 		return nil
 	}
 	graphNodeHistory, err := tl.fetchGraphNodeHistory(tl.profile, false)

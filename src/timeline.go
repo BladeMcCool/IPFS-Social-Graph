@@ -186,16 +186,15 @@ func (tl *Timeline) LoadProfile() error {
 }
 
 func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TLProfile, error) {
-	//resolve ipns
 	var err error
 	if profileCid == nil {
 		profileCid, err = tl.ipfs.determineProfileCid(profileId)
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("fetchCheckProfile: determined profileCid to be %s", *profileCid)
+		//log.Printf("fetchCheckProfile: determined profileCid to be %s", *profileCid)
 	} else {
-		log.Printf("fetchCheckProfile: explicitly requesting profileCid %s", *profileCid)
+		//log.Printf("fetchCheckProfile: explicitly requesting profileCid %s", *profileCid)
 	}
 	if profileCid == nil {
 		return nil, errors.New(fmt.Sprintf("could not obtain profile cid for profile id %s", profileId))
@@ -209,20 +208,20 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 		follows: map[string]*TLProfile{},
 		cid: *profileCid,
 	}
-	//log.Printf("fetchCheckProfile to fetch profile id %s got raw profile bytes as string: %s", profileId, string(profileBytes))
+	////log.Printf("fetchCheckProfile to fetch profile id %s got raw profile bytes as string: %s", profileId, string(profileBytes))
 	err = json.Unmarshal(profileBytes, profile)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("fetchCheckProfile to fetch profile id %s ('%s') got: %#v", profileId, profile.DisplayName, profile)
+	//log.Printf("fetchCheckProfile to fetch profile id %s ('%s') got: %#v", profileId, profile.DisplayName, profile)
 	if profile.Id != profileId {
 		return nil, fmt.Errorf("invalid profile with mismatched id. got %s, expected %s", profile.Id, profileId)
 	}
 
 	if profile.Previous != nil {
-		log.Printf("fetchCheckProfile previous profile cid for this profile: %s", *profile.Previous)
+		//log.Printf("fetchCheckProfile previous profile cid for this profile: %s", *profile.Previous)
 	}
-	log.Printf("fetchCheckProfile tip for profile: %s", profile.GraphTip)
+	//log.Printf("fetchCheckProfile tip for profile: %s", profile.GraphTip)
 
 	//set pubkey
 	//pubkey, err := x509.ParsePKCS1PublicKey(profile.Pubkey)
@@ -232,7 +231,6 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 	}
 	pubkey, ok := pubkeyInterface.(*rsa.PublicKey)
 	if !ok {
-		panic("remove this after it doesnt happen.")
 		return nil, err
 	}
 
@@ -244,7 +242,7 @@ func (tl *Timeline) fetchCheckProfile(profileId string, profileCid *string) (*TL
 	//verify self-signature of profile.
 	_, err = tl.checkProfileSignature(profile.Profile, pubkey)
 	if err != nil {
-		log.Printf("INVALID SIG")
+		log.Printf("INVALID SIG in profile id %s with data in profile cid %s", profileId, *profileCid)
 		return nil, err
 	}
 	profile.pubkey = pubkey

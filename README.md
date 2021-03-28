@@ -2,7 +2,9 @@
   
 An IPFS Social Graph. Create a social Profile, and use the RSA keys to sign new GraphNodes and Profile versions which link to their previous records immutably. Provide a Web UI to crawl this data using js-ipfs. Provide a server component to federate lists of updated profile tip information among network operators using a go-ipfs instance. 
 
-Watch an early pre-alpha tech demo on Youtube: https://www.youtube.com/watch?v=8DjmmvUvuxE
+Watch a Demo Video: https://www.youtube.com/watch?v=6j9JGxelsZk
+
+Much earlier demo video (pre-alpha proof of concept): https://www.youtube.com/watch?v=8DjmmvUvuxE
 
 Live demo: https://ipfstoy.chws.ca
   

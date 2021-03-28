@@ -148,6 +148,7 @@ func (df *IPNSDelegateFederation) mergeInProfileTipCids(profileTipCids map[strin
 	defer df.mutex.Unlock()
 	for profileId, profileCid := range profileTipCids {
 		if df.lister.CheckBl(profileId) {
+			log.Printf("mergeInProfileTipCids profileId %s is on the bl, won't be including.", profileId)
 			continue
 		}
 		//if _, found := df.clientUpdatedProfileCids[profileId]; found {

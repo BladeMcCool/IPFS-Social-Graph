@@ -91,7 +91,7 @@ async function setIdentity(keyname) {
 
     // let latestTimelineTextsJson = await getLatestTimelineTexts(identity["pub"], identity["profiletip"])
     // displayTimelineTextsFromServer(latestTimelineTextsJson)
-    await loadJsTimeline()
+    await updateJsTimeline()
     timelineUpdaterInterval = setInterval(() => {
         updateJsTimeline()
         updateFriendlyTimestamps()

@@ -14,12 +14,14 @@ let repostedCids = {}
 let followeeProfiles = {}
 let follows = {}
 let unfollows = {}
+let followbacks = {}
 let followButtons = {}
 let noTsGnodes = {}
 let profileTipCache = {}
 let gnOfInterestByProfileId = {}
 let gnOfInterest = {}
 let profilesOfInterest = {}
+let fetchingProfileMutex = {}
 
 function resetTextTimelineArea() {
     let target = document.getElementById("tlcontainer")
@@ -248,9 +250,11 @@ async function createProfilePost(noconfirmFollow) {
 
     if (inputFlds["followprofileid"]) {
         delete unfollows[inputFlds["followprofileid"]] //otherwise spidering code will not re-add anything that was previously unfollowed.
+        follows[inputFlds["followprofileid"]] = true
     }
     if (inputFlds["unfollowprofileid"]) {
         delete follows[inputFlds["unfollowprofileid"]] //otherwise spidering code will not un-add anything that was previously followed.
+        unfollows[inputFlds["unfollowprofileid"]] = true
     }
     // followprofileid
     // unfollowprofileid
@@ -373,7 +377,7 @@ function performRecaptchaChallenge(profileId) {
 function unfollow(profileId) {
     //set the field and call the create post func.
     document.getElementById("unfollowprofileid").value = profileId
-    createProfilePost()
+    return createProfilePost()
 }
 function follow(profileId, noconfirm) {
     //set the field and call the create post func.
@@ -456,6 +460,9 @@ function performDomInsertion(gnode) {
     }
 
     if (includeInMainTl) {
+        if (gnode.Cid == "QmThaqA4WN8zzjMnaXxYXkP8tqtZXkX35pqhSCLUUB7mdz") {
+            console.log("DBGXX inserting target cid in maintl.")
+        }
         gnode.includeInMainTl = true
         let mainTlcompare = (a, b) => {
             return a.jsDate > b.jsDate ? -1 : 1
@@ -557,6 +564,10 @@ function removeUnfolloweePosts(profileId) {
                 // timelineEl.removeChild(gnode.domElements.container)
                 domEaseoutPopper(gnode.domElements.container, timelineEl)
                 //  remove it from the ordered array
+                if (gnode.Cid == "QmThaqA4WN8zzjMnaXxYXkP8tqtZXkX35pqhSCLUUB7mdz") {
+                    console.log("DBGXX removing target cid from maintl.")
+                }
+
                 orderedTimelineElements.splice(orderedTimelineElements.indexOf(gnode), 1)
             } else {
                 console.log("unsure at this time how to remove and reinsert from non maintl stuff.")
@@ -618,12 +629,19 @@ function prepareDomElements(gnode) {
 
     // swap ourself in for the dummy entry if there is a dummy entry.
     let replyParent = gnReplyParents[gnode.Cid]
-    if (replyParent && replyParent.dummyParent) {
+    // if (replyParent && replyParent.dummyParent) {
+    //     gnode.replies = replyParent.replies
+    //     gnode.domElements.replyContainer = replyParent.domElements.replyContainer
+    // } else {
+    //     gnode.domElements.replyContainer = createReplyContainerDiv()
+    // }
+    if (replyParent) {
         gnode.replies = replyParent.replies
         gnode.domElements.replyContainer = replyParent.domElements.replyContainer
     } else {
         gnode.domElements.replyContainer = createReplyContainerDiv()
     }
+
     //replace any dummy-reply-holder with ourself now.
     gnReplyParents[gnode.Cid] = gnode
     entryContainer.id = "entry" + Object.keys(gnReplyParents).length
@@ -1408,20 +1426,27 @@ async function populateFederationMembers() {
 }
 
 
+function membersprofilelistUpdate(swapToUnshownMemberspane) {
+    resetProfilesInfoArea()
+
+    if (swapToUnshownMemberspane) {
+        document.getElementById("mainuipane").style.display = "none"
+        document.getElementById("memberspane").style.display = ""
+    }
+
+    obtainProfilesInfo().catch((e)=>{
+        console.log(e)
+    })
+
+}
 function membersswap() {
     if (isMainScreenShowing()) {
-        let outputEl = document.getElementById("memberspane")
-        outputEl.textContent = ""
-
-        document.getElementById("mainuipane").style.display="none"
-        document.getElementById("memberspane").style.display=""
+        //reset the lists that we are about to load
+        membersprofilelistUpdate(true)
     } else {
         resetSecretSauce()
         showMainScreen()
     }
-    obtainFederatedProfilesInfo().catch((e)=>{
-        console.log(e)
-    })
 }
 
 function clearReply() {

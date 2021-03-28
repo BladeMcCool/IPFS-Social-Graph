@@ -4,6 +4,9 @@ let multihistory = {}
 // const binaryInsert = require('binary-insert').binaryInsert
 
 async function loadJsTimeline() {
+    console.log("deprecated, use the updateJsTimeline.")
+    return
+
     // alert("...")
     asyncPool = require("tiny-async-pool")
     if (!ipfsStarted) {
@@ -28,7 +31,7 @@ async function loadJsTimeline() {
         console.log("load history got error from fetchCheckProfile:", e)
         return
     }
-    await fetchGraphNodeHistory(profileData, true, multihistory)
+    await fetchGraphNodeHistory(profileData, true, multihistory, false)
     // let followees = extractFollowsProfileCids(history)
 
     // await fillHistoryPreviews(history)
@@ -45,6 +48,15 @@ async function loadJsTimeline() {
 async function updateJsTimeline() {
     //i want to find updates only.
     //so ... for every profileid i follow and my own one, go spider that like a normal timeline load, except stop when we hit data we already know.
+    if (!ipfsStarted) {
+        await startIpfs()
+        ipfsStarted = true
+    }
+    if (!identity) {
+        console.log("no identity selected")
+        return
+    }
+
     await cancelCurrentHistoryRequest() //in case there is a server one going, kill it.
     let profileData
     try {
@@ -57,10 +69,13 @@ async function updateJsTimeline() {
         return
     }
     //we can spider with normal method to find anything new we made and new followee history etc resulting from those actions by our profile.
+    // let followbackUpdatesTracker = {}
+    let alreadyFollows = {}
+    Object.assign(alreadyFollows, follows)
     fetchGraphNodeHistory(profileData, true, multihistory, true).catch(e => console.log(`updateJsTimeline fetchGraphNodeHistory err while collecting for ${profileData.Id}: `, e))
 
     //but we arent going to end up going and redoing our followees under normal circumstances. so lets do those
-    for (let followeeProfileId in follows) {
+    for (let followeeProfileId in alreadyFollows) {
         getFolloweeProfileInfo(followeeProfileId).then(followeeProfileInfo => {
             fetchGraphNodeHistory(followeeProfileInfo, false, multihistory, true).catch(e => console.log(`updateJsTimeline fetchGraphNodeHistory err while collecting for followee ${profileData.Id}: `, e))
         }).catch(e => console.log(`updateJsTimeline getFolloweeProfileInfo err while collecting for ${profileData.Id}: `, e))
@@ -81,13 +96,19 @@ function incrementSauce() {
     }
 }
 
+function resetProfilesInfoArea() {
+    document.getElementById("serverlist").textContent = ""
+    document.getElementById("followees").textContent = ""
+}
+
 // let meIcons = []
 let loadingProfilesInfo = false
-async function obtainFederatedProfilesInfo() {
+async function obtainProfilesInfo() {
     if (loadingProfilesInfo) { return }
     loadingProfilesInfo = true
     // superSecretModeEnabled = true;
-    let profilesList = []
+    let fedmembersprofilesList = []
+    let followeesprofilesList = []
     let obtainmentServerPath = serviceBaseUrl + "/service/curatedProfiles"
     if (superSecretModeEnabled) {
         //secret as much as someone cares to not review the source code to find this.
@@ -96,13 +117,10 @@ async function obtainFederatedProfilesInfo() {
     let result = await makeRequest("GET", obtainmentServerPath)
     let decodedResult = JSON.parse(result)
 
-    ///TODO before calling this, show the empty area for this stuff to be put into
-    let outputEl = document.getElementById("memberspane")
-
-    let insertFunc = function(i, profileData) {
-        let existingChildren = outputEl.childNodes
-        if (i == outputEl.childNodes.length) {
-            outputEl.appendChild(profileData.domElement);
+    let insertFuncGetter = function(xOutputEl) { return function(i, profileData) {
+        let existingChildren = xOutputEl.childNodes
+        if (i == xOutputEl.childNodes.length) {
+            xOutputEl.appendChild(profileData.domElement);
         } else {
             //new one becomes the new element i of the children ... meaning add it before existing element i
             console.log(`blast into list and become elem ${i}`)
@@ -114,45 +132,52 @@ async function obtainFederatedProfilesInfo() {
             let siblingParent = siblingOfNew.parentNode
             siblingParent.insertBefore(profileData.domElement, siblingOfNew);
         }
-    }
+    }}
     let compareFunc = (a, b) => {
         return a.DisplayName.toLowerCase() > b.DisplayName.toLowerCase() ? 1 : -1
     }
 
+    let followeeInsertFunc = insertFuncGetter(document.getElementById("followees"))
+    for (let profileId of Object.keys(follows)) {
+        if (profileId == selectedIdentityProfileId) { continue } // this shouldnt actually happen, i just dont really want to see it if it does.
+        let profileData = followeeProfiles[profileId]
+        if (!profileData) {
+            console.log(`obtainProfilesInfo did not get info for followee profile id ${profileId}`)
+            continue
+        }
+        if (!profileData.domElement) {
+            profileData.domElement = makeProfilePtag(profileData)
+        } else {
+            profileData.domElement.classList.remove("expanded")
+        }
+        profileData.domElement.classList.add("collapsed")
+        xbinaryInsert(followeesprofilesList, profileData, compareFunc, followeeInsertFunc)
+        setTimeout(function(){
+            profileData.domElement.classList.remove("collapsed")
+            profileData.domElement.classList.add("expanded")
+        }, 100)
+    }
 
+    let fedmembersInsertFunc = insertFuncGetter(document.getElementById("serverlist"))
     for (let profileId of Object.keys(decodedResult)) {
+        if (follows[profileId] || profileId == selectedIdentityProfileId) {
+            continue
+        }
+
         let profileTipCid = decodedResult[profileId]
-        console.log(`${profileId} -> ${profileTipCid}`)
+        console.log(`profile tip for profileid ${profileId} -> ${profileTipCid}`)
         let obtainer = function(xProfileId, xProfileCid) {
             getCidContentsStringByCat(xProfileCid, true).then(function(profileJson){
                 // console.log(`GOT ${xProfileId} -> ${xProfileCid} ->`, profileJson)
                 let profileData = JSON.parse(profileJson)
-                let ptag = document.createElement("p")
-                ptag.innerHTML = jdenticon.toSvg(profileId, 20);
-                ptag.querySelector("svg").classList.add("smallicon")
-                ptag.classList.add("collapsed")
-                let atag = makeATag("&#x1f465;", function (profileId) {
-                    return async function () {
-                        let actuallyFollowed = await follow(profileId)
-                        if (!actuallyFollowed) {
-                            return false;
-                        }
-                        membersswap()
-                        focusPostText()
-                        return false;
-                    }
-                }(xProfileId), true)
+                profileData.domElement = makeProfilePtag(profileData)
+                profileData.domElement.classList.add("collapsed")
 
-                ptag.appendChild(document.createTextNode(profileNametag(profileData)))
-                ptag.appendChild(atag)
-
-                // outputEl.appendChild(ptag)
-                profileData.domElement = ptag
-                xbinaryInsert(profilesList, profileData, compareFunc, insertFunc)
+                xbinaryInsert(fedmembersprofilesList, profileData, compareFunc, fedmembersInsertFunc)
 
                 setTimeout(function(){
-                    ptag.classList.remove("collapsed")
-                    ptag.classList.add("expanded")
+                    profileData.domElement.classList.remove("collapsed")
+                    profileData.domElement.classList.add("expanded")
                 }, 100)
                 // TODO can put something good into the dom here now
             }).catch(function(e){
@@ -162,7 +187,55 @@ async function obtainFederatedProfilesInfo() {
         }
         obtainer(profileId, profileTipCid)
     }
+
     loadingProfilesInfo = false
+}
+
+function makeProfilePtag(profileData) {
+    let ptag = document.createElement("p")
+    ptag.innerHTML = jdenticon.toSvg(profileData.Id, 20);
+    ptag.querySelector("svg").classList.add("smallicon")
+    ptag.appendChild(document.createTextNode(profileNametag(profileData)))
+
+    let atag
+
+    if (follows[profileData.Id]) {
+        if (followbacks[profileData.Id]) {
+            let txtNode = document.createElement("span")
+            txtNode.innerHTML = "&#x21A9;"
+            ptag.appendChild(txtNode)
+        }
+        atag = makeATag("&#x2718;", function (xProfileId) {
+            return async function () {
+                let actuallyunFollowed = await unfollow(xProfileId)
+                if (!actuallyunFollowed) {
+                    return false;
+                }
+                showMainScreen()
+                // membersprofilelistUpdate()
+                // membersswap()
+                // focusPostText()
+                return false;
+            }
+        }(profileData.Id), true)
+
+    } else {
+        atag = makeATag("&#x1f465;", function (xProfileId) {
+            return async function () {
+                let actuallyFollowed = await follow(xProfileId)
+                if (!actuallyFollowed) {
+                    return false;
+                }
+                showMainScreen()
+                // membersprofilelistUpdate()
+                // membersswap()
+                // focusPostText()
+                return false;
+            }
+        }(profileData.Id), true)
+    }
+    ptag.appendChild(atag)
+    return ptag
 }
 
 async function promptToFollowCurated() {
@@ -468,9 +541,9 @@ async function fillRepostPreviewInfo(gnode) {
         }
     } catch (e) {
         if (e.message == 'request timed out') {
-            gnode.RepostPreviewText = `[timed out getting ${gnode.post.Cid}]`
+            gnode.RepostPreviewText = `[timed out getting ${gnode.repost}]`
         } else {
-            gnode.RepostPreviewText = `[error getting ${gnode.post.Cid} : ${e.message}]`
+            gnode.RepostPreviewText = `[error getting ${gnode.repost} : ${e.message}]`
         }
     }
     updateTimelineRepost(gnode)
@@ -525,6 +598,10 @@ async function fillHistoryRepostInfo(entries) {
 }
 
 async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistory, stopAtKnown) {
+    if (fetchingProfileMutex[profile.Id]) {
+        return
+    }
+    fetchingProfileMutex[profile.Id] = true
     // let headGnJson = await getCidContentsByCat(profile["GraphTip"])
     console.log("fetchGraphNodeHistory to collect profile id", profile.Id)
     // headGn = JSON.parse(headGnJson)
@@ -541,6 +618,9 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
     let headGn = {"previous":profile["GraphTip"]}
     // let lastProcessedGn = null
     let currentGn = undefined
+    let profileInteractionTracker = {}
+    let followBackTracker = {}
+
     while (headGn["previous"] != null) {
 
         console.log("here3 about to getCidContentsByCat", headGn)
@@ -549,12 +629,17 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
             console.log(`fetchGraphNodeHistory: stopping additional collection of data from profileId ${profile.Id} due to encountering known cid ${currentGnCid} in the history -- collected all new info for this profile.`)
             break
         }
+        if (profile.Id != selectedIdentityProfileId && unfollows[profile.Id]) {
+            //it is possible that WHILE we are doing this for a followee that we think we are following, that we might realize we no longer follow this profile, because async code might have hit an unfollow for them.
+            //in which case there will be code that is going to remove that stuff from the dom running, and we don't want to start putting stuff back in the dom for that profile in the event that happened. is due to racyness of async stuff. not sure on better logic to deal with this kind of thing.
+            console.log(`fetchGraphNodeHistory: stopping additional collection of data from profileId ${profile.Id} due the sudden realization that we no longer actually follow this profile id`)
+            break
+        }
 
         try {
             let currentGnJson = await getCidContentsByCat(currentGnCid, true)
-            console.log("here4", currentGnJson)
             currentGn = JSON.parse(currentGnJson)
-            console.log("here5 currentGnJson", currentGnJson)
+            console.log(`fetchGraphNodeHistory gn cid ${currentGnCid} in history of ${profile.Id}: gnode:`, currentGn)
         } catch(e) {
             console.log(`fetchGraphNodeHistory: error fetching ${currentGnCid}:`, e)
             break
@@ -569,6 +654,7 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
         currentGn.profile = profile
         currentGn.Cid = currentGnCid
         currentGn.Indent = 0 //temp
+        // currentGn.replies = gnOfInterest[currentGnCid] && gnOfInterest[currentGnCid].replies ? gnOfInterest[currentGn.Cid].replies : []
         currentGn.replies = []
 
         //todo if this next/prev isnt useful then get rid of it.
@@ -592,51 +678,111 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
         fillPostPreviewInfo(currentGn).catch((e)=>{console.log("fillPostPreviewInfo had err", e)})
         fillRepostPreviewInfo(currentGn).catch((e)=>{console.log("fillRepostPreviewInfo had err", e)})
         if (trackLoadFolloweeInfo) {
+            // TODO break this whole bit into trackLoadFolloweeInfo()
             if (currentGn["publicufollow"]) {
                 for (let i = 0; i < currentGn["publicufollow"].length; i++) {
                     let unfollowProfileId = currentGn["publicufollow"][i]
+                    if (alreadyTrackedStateChangeFor(unfollowProfileId, profileInteractionTracker)) {
+                        continue
+                    }
+                    trackStateChangeFor(unfollowProfileId, profileInteractionTracker, "unfollow")
                     unfollows[unfollowProfileId] = true
+                    delete follows[unfollowProfileId]
                     removeUnfolloweePosts(unfollowProfileId)
                 }
             }
             if (currentGn["publicfollow"]) {
+                currentGn.followeeProfileInfo = {}
                 for (let i = 0; i < currentGn["publicfollow"].length; i++) {
                     let followProfileId = currentGn["publicfollow"][i]
-                    let getFolloweeProfileInfoOnly = false
-                    if (unfollows[followProfileId] || follows[followProfileId]) {
-                        //either is unfollowed now, or is known to be followed already and thus the history will already have been gotten.
-                        //just get info for display of followee on this gn if needed.
-                        getFolloweeProfileInfoOnly = true
-                    }
-                    currentGn.followeeProfileInfo = {}
-                    if (getFolloweeProfileInfoOnly) {
-                        console.log(`fetchGraphNodeHistory: only getFolloweeProfileAndUpdateGn for ${followProfileId}`)
+
+                    if (alreadyTrackedStateChangeFor(followProfileId, profileInteractionTracker)) {
                         getFolloweeProfileAndUpdateGn(followProfileId, currentGn).catch((e)=>{console.log("getFolloweeProfileAndUpdateGn had err", e)})
                         continue
                     }
+                    trackStateChangeFor(followProfileId, profileInteractionTracker, "follow")
 
                     follows[followProfileId] = true
+                    delete unfollows[followProfileId]
+
                     hideFollowButtonsForProfileId(followProfileId)
                     /// go get em tiger
                     console.log(`fetchGraphNodeHistory: welp, go get followee history for ${followProfileId}`)
                     getFillFolloweeHistory(followProfileId, multihistory, currentGn).catch((e)=>{console.log("getFillFolloweeHistory had err", e)})
+
+                    // let getFolloweeProfileInfoOnly = false
+                    // if (unfollows[followProfileId] || follows[followProfileId]) {
+                    //     //either is unfollowed now, or is known to be followed already and thus the history will already have been gotten.
+                    //     //just get info for display of followee on this gn if needed.
+                    //     getFolloweeProfileInfoOnly = true
+                    // }
+                    // currentGn.followeeProfileInfo = {}
+                    // if (getFolloweeProfileInfoOnly) {
+                    //     console.log(`fetchGraphNodeHistory: only getFolloweeProfileAndUpdateGn for ${followProfileId}`)
+                    //     getFolloweeProfileAndUpdateGn(followProfileId, currentGn).catch((e)=>{console.log("getFolloweeProfileAndUpdateGn had err", e)})
+                    //     continue
+                    // }
+
                 }
             }
+        }
+
+        if (currentGn.ProfileId == "QmcBj5LhscNSX58kiiKsWVhvmtAWcHsAebBccC149dBx5S") {
+            console.log("saw the target")
+        }
+        //followback by followees tracking
+        if (currentGn.ProfileId != selectedIdentityProfileId && followBackTracker) {
+            if (currentGn["publicufollow"]) {
+                for (let i = 0; i < currentGn["publicufollow"].length; i++) {
+                    let followeeUnfollowsProfileId = currentGn["publicufollow"][i]
+                    if (followeeUnfollowsProfileId != selectedIdentityProfileId) { continue } //its not interesting if its not about us.
+                    if (followBackTracker[currentGn.ProfileId] !== undefined) {
+                        continue
+                    }
+                    followBackTracker[currentGn.ProfileId] = false
+                    delete followbacks[currentGn.ProfileId]
+                }
+            }
+            if (currentGn["publicfollow"]) {
+                for (let i = 0; i < currentGn["publicfollow"].length; i++) {
+                    let followeeFollowsProfileId = currentGn["publicfollow"][i]
+                    if (followeeFollowsProfileId != selectedIdentityProfileId) { continue } //its not interesting if its not about us.
+                    if (followBackTracker[currentGn.ProfileId] !== undefined) {
+                        continue
+                    }
+                    followBackTracker[currentGn.ProfileId] = true
+                    followbacks[currentGn.ProfileId] = true
+                }
+            }
+
         }
         headGn = currentGn
         console.log("here6")
     }
     console.log("fetchGraphNodeHistory for profile id " + profile["Id"] + " got " + history.length + " entries starting at tip " + profile["GraphTip"])
+    delete fetchingProfileMutex[profile.Id]
     // for (i = 0; i < history.length; i++) {
     //     console.log(i, history[i])
     // }
     // return history
 }
 
+function alreadyTrackedStateChangeFor(profileId, profileInteractionTracker) {
+    if (!profileInteractionTracker[profileId]) {
+        return false
+    }
+    return true
+}
+function trackStateChangeFor(profileId, profileInteractionTracker, state) {
+    profileInteractionTracker[profileId] = {}
+    profileInteractionTracker[profileId][state] = true
+}
+
+
 let followeeProfileInfo = {}
 async function getFillFolloweeHistory(profileId, multihistory, followedInGn) {
     let followeeProfile = await getFolloweeProfileAndUpdateGn(profileId, followedInGn)
-    await fetchGraphNodeHistory(followeeProfile, false, multihistory)
+    await fetchGraphNodeHistory(followeeProfile, false, multihistory, true)
 }
 
 async function getFolloweeProfileAndUpdateGn(profileId, followedInGn) {

@@ -374,7 +374,7 @@ func Test_encrypt_decrypt_sign_verify(t *testing.T) {
 	fmt.Println("signature verified")
 }
 
-func Test_JSONTime(t *testing.T) {
+func Test_JSON_TimesAndUndocumentedKeys(t *testing.T) {
 	timeWot := time.Now().UTC().Truncate(time.Second)
 	t.Logf("timewot: %#v", timeWot)
 	stupid := &Post{
@@ -387,11 +387,16 @@ func Test_JSONTime(t *testing.T) {
 	//
 	//}
 	poopid, err := json.Marshal(stupid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("%s\n\n", poopid)
+	require.Nil(t, err)
+	t.Logf("%#v\n\n", string(poopid))
 	t.Log("GOOD TO GO")
+
+	alt := "{\"MimeType\":\"x\",\"Cid\":\"y\",\"Date\":\"2021-03-22T23:58:16Z\",\"Reply\":null,\"XXXXXXNonSpeccedField\":\"abcd\"}"
+	blank := &Post{}
+	err = json.Unmarshal([]byte(alt), blank)
+	require.Nil(t, err)
+	t.Logf("%#v\n\n", blank)
+
 	// 2021-03-22T17:11:39Z
 }
 
