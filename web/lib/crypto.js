@@ -10,6 +10,12 @@ var signAlgorithm = {
     publicExponent: new Uint8Array([1, 0, 1])
 }
 var scopeSign = ["sign", "verify"]
+let cryptscheme = {
+    name: "RSA-OAEP",
+    modulusLength: 2048,
+    publicExponent: new Uint8Array([1, 0, 1]),
+    hash: "SHA-256",
+}
 
 function generateKey() {
     return crypto.subtle.generateKey(signAlgorithm, true, scopeSign)
@@ -149,25 +155,108 @@ async function derivePubkeyFromPrivkey(privkeyB64) {
 }
 
 let importedKeys = {}
-function getPubkeyForProfileId(profileId) {
-    if (!importedKeys[profileId]) {
+let importedCryptKeys = {}
+function keystoreForUse(use) {
+    if (use == "verify") { return importedKeys }
+    return importedCryptKeys
+}
+function getPubkeyForProfileId(profileId, keyuse) {
+    if (!keyuse) { keyuse = "verify" }
+    if (!keystoreForUse(keyuse)[profileId]) {
         return null
     }
-    return importedKeys[profileId]
+    return keystoreForUse(keyuse)[profileId]
 }
-async function importProfilePubkey(profileId, pubkeyB64) {
-    alreadyImported = getPubkeyForProfileId(profileId)
+async function importProfilePubkey(profileId, pubkeyB64, keyuse) {
+    if (!keyuse) { keyuse = "verify" }
+    let alreadyImported = getPubkeyForProfileId(profileId, keyuse)
     if (alreadyImported) {
         return alreadyImported
     }
     try {
         console.log("decode and import this:", pubkeyB64)
         let arraybuf = base64StringToArrayBuffer(pubkeyB64)
-        pubkey = await crypto.subtle.importKey("spki", arraybuf, signAlgorithm, true, ["verify"])
-        importedKeys[profileId] = pubkey
+        let pubkey
+        if (keyuse == "verify") {
+            pubkey = await crypto.subtle.importKey("spki", arraybuf, signAlgorithm, true, ["verify"])
+        } else if (keyuse == "encrypt") {
+            pubkey = await crypto.subtle.importKey("spki", arraybuf, cryptscheme, true, ["encrypt"])
+        } else {
+            throw new Error("invalid use")
+        }
+        keystoreForUse(keyuse)[profileId] = pubkey
         return pubkey
     } catch (e) {
         console.log("importProfilePubkey got importKey error", e)
         return null
     }
+}
+
+
+async function encryptMessage(toProfileId, messageText) {
+    //need to get the pubkey from toProfileId and use it for encryption
+    // let message = "i am a little boy"
+    let pubkeyB64 = profilesOfInterest[toProfileId]["Pubkey"]
+    let arraybuf = base64StringToArrayBuffer(pubkeyB64)
+    let encryptWithPubkey = await importProfilePubkey(toProfileId, pubkeyB64, "encrypt")
+    // let encryptWithPubkey = await crypto.subtle.importKey("spki", arraybuf, cryptscheme, true, ["encrypt"])
+
+    let ciphertextArraybuffer = await window.crypto.subtle.encrypt(
+        {
+            name: "RSA-OAEP"
+        },
+        encryptWithPubkey,
+        new Uint8Array(messageText.toByteArray())
+    );
+    // console.log("cypherdis", ciphertext)
+    return ciphertextArraybuffer
+    // let potatoes = await addContentsToIPFS(ciphertext)
+    // console.log("rfoyal potatoe", potatoes)
+    // let enc = new TextEncoder();
+    // return
+}
+
+async function decryptMessage(ciphertextByteArray) {
+    //need to get the pubkey from toProfileId and use it for encryption
+
+    // let
+    // if (!ciphertextByteArray) {
+    //     //temp hax
+    //     ciphertextByteArray = await getCidContentsByGet("QmWvCsDw3yNw1hBskeeQf6pTgH8hFKrX7An7SP13ynNxxG")
+    // }
+
+    let decrypted
+    try {
+        decrypted = await window.crypto.subtle.decrypt(
+            {
+                name: "RSA-OAEP"
+            },
+            selectedIdentityPrivKeyImportedForDecrypt,
+            ciphertextByteArray
+        );
+    } catch(e) {
+        console.log("decryptMessage error", e)
+        return
+    }
+
+    let dec = new TextDecoder();
+    let decryptedValue = dec.decode(decrypted);
+    console.log("back to: ", decryptedValue)
+    return decryptedValue
+}
+
+async function importPrivkeyFromB64ForDecrypt(privkeyb64) {
+    let privkeyArrayBuffer = base64StringToArrayBuffer(privkeyb64)
+    let privkey = await crypto.subtle.importKey("pkcs8", privkeyArrayBuffer, cryptscheme, true, ["decrypt"])
+    // let altkey = await window.crypto.subtle.importKey(
+    //     "pkcs8",
+    //     privkeyArrayBuffer,
+    //     {
+    //         name: "RSA-OAEP",
+    //         hash: "SHA-256"
+    //     },
+    //     true,
+    //     ["decrypt"]
+    // );
+    return privkey
 }

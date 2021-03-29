@@ -26,6 +26,8 @@
       /*grid-template-columns: 50px minmax(0, 1fr);*/
       /*grid-template-rows: 50px;*/
       /*overflow-y: hidden*/
+      max-width: 500px;
+      margin: 0 auto;
     }
     /*div.wrapper  { border: 0px solid black; }*/
     /*.wrapper .hamburgers {*/
@@ -50,10 +52,58 @@
       overflow: hidden
     }
     #memberspane {
-      margin-right: 7px;
+      /*margin-right: 7px;*/
+      padding-right: 7px;
       overflow-y: scroll;
       height: 100%;
     }
+
+    div#memberspane p {
+      font-size: 12px;
+      padding-top: 2px;
+    }
+    div#followees {
+      margin-top: 7px;
+    }
+
+    div#followees p {
+      margin: 0px;
+    }
+    div#followees div.dmscontainer { overflow: hidden; } /* https://stackoverflow.com/questions/2062258/floating-elements-within-a-div-floats-outside-of-div-why */
+
+    div#followees .dmscontainer p {
+      max-width: 80%;
+      padding: 7px;
+      border-radius: 3px;
+    }
+    div#followees .dmscontainer p.from.message {
+      background-color: lightgray;
+      clear:both;
+      float:left;
+    }
+    div#followees .dmscontainer p.time {
+      padding-top: 2px;
+      font-size: 9px;
+    }
+    div#followees .dmscontainer p.from.time {
+      clear:both;
+      float:left;
+    }
+    div#followees .dmscontainer p.to.message {
+      background-color: lightblue;
+      clear:both;
+      float:right;
+    }
+    div#followees .dmscontainer p.to.time {
+      clear:both;
+      float:right;
+    }
+
+    div#serverlist p {
+      margin: 0px;
+    }
+
+
     #menuthing {
       height: 100%;
       overflow-y: scroll;
@@ -332,7 +382,7 @@
       <div class="profilename" style="float:left; margin-left: 7px;"><p id="profilename"><svg class="smallicon"></svg> </p></div>
       <p onclick="menuswap()" class="menubutton">&#x2630;</p>
       <p onclick="membersswap()" class="menubutton">&#x1f465;</p>
-      <p class="iteractionbuttons" style=""><span class="btn" style="display: none" id="replyingicon" onclick="clearReplyAndFocus()">&#x1f5e8;</span><span class="btn" style="display: none" id="repostingicon" onclick="clearRepostAndFocus()">&#x1f504;</span><span id="interactwith" style="cursor: default"></span></p>
+      <p class="iteractionbuttons" style=""><span class="btn" style="display: none" id="dmingicon" onclick="clearDmForAndFocus()">&#x1F512;</span><span class="btn" style="display: none" id="replyingicon" onclick="clearReplyAndFocus()">&#x1f5e8;</span><span class="btn" style="display: none" id="repostingicon" onclick="clearRepostAndFocus()">&#x1f504;</span><span id="interactwith" style="cursor: default"></span></p>
     </div>
     <div id="rightpane">
 
@@ -364,6 +414,7 @@
               <p>In Reply To :&nbsp;<input type="text" id="inreplyto" name="inreplyto">&nbsp;<button onclick="clearReply()">Clear</button></p>
               <p>Follow ProfileId:&nbsp;<input type="text" id="followprofileid" name="followprofileid">&nbsp;<button onclick="clearFollow()">Clear</button></p><!-- a ProfileId -->
               <p>Unfollow ProfileId:&nbsp;<input type="text" id="unfollowprofileid" name="unfollowprofileid">&nbsp;<button onclick="clearUnfollow()">Clear</button></p><!-- a ProfileId -->
+              <p>DM For ProfileId:&nbsp;<input type="text" id="dmfor" name="dmfor">&nbsp;<button onclick="clearDmFor()">Clear</button></p><!-- a profile Id -->
               <p>Retract Node Cid:&nbsp;<input type="text" id="retractionofnodecid" name="retractionofnodecid">&nbsp;<button onclick="clearRetraction()">Clear</button></p><!-- a graphnode cId -->
               <p>Repost Node Cid:&nbsp;<input type="text" id="repostofnodecid" name="repostofnodecid">&nbsp;<button onclick="clearRepost()">Clear</button></p><!-- a graphnode cId -->
               <p style="display:none">Like Node Cid:&nbsp;<input type="text" id="likeofnodecid" name="likeofnodecid">&nbsp;<button onclick="clearLike()">Clear</button></p><!-- a graphnode cId -->

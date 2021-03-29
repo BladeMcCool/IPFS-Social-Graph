@@ -33,8 +33,9 @@ type GraphNode struct {
 
 	Signature []byte
 	Date *time.Time `json:",omitempty"`
-	// maybe the date belongs up in here
-	// also anyone could just lie about the date so maybe
+	Dm []byte `json:",omitempty"`
+
+	// anyone could just lie about the date so maybe
 	// the concept of timestamp oracles could be used somehow
 	// oracle would need to certify the time it saw the post
 	// could put cids of oracle sigs, those would just look like post hash, timestamp and signature.

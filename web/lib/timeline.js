@@ -148,6 +148,10 @@ async function obtainProfilesInfo() {
         if (!profileData.domElement) {
             profileData.domElement = makeProfilePtag(profileData)
         } else {
+            let dmscontainer = profileData.domElement.querySelector("div.dmscontainer")
+            if (dmscontainer) {
+                dmscontainer.textContent = ""
+            }
             profileData.domElement.classList.remove("expanded")
         }
         profileData.domElement.classList.add("collapsed")
@@ -195,15 +199,32 @@ function makeProfilePtag(profileData) {
     let ptag = document.createElement("p")
     ptag.innerHTML = jdenticon.toSvg(profileData.Id, 20);
     ptag.querySelector("svg").classList.add("smallicon")
-    ptag.appendChild(document.createTextNode(profileNametag(profileData)))
+    let nameTextNode = document.createTextNode(profileNametag(profileData))
+    let nameSpanWrapper = document.createElement("span")
+    nameSpanWrapper.appendChild(nameTextNode)
+    ptag.appendChild(nameSpanWrapper)
 
     let atag
 
     if (follows[profileData.Id]) {
         if (followbacks[profileData.Id]) {
-            let txtNode = document.createElement("span")
-            txtNode.innerHTML = "&#x21A9;"
-            ptag.appendChild(txtNode)
+            let mailIconSpan = document.createElement("span")
+            mailIconSpan.innerHTML = "&#x2709;" //come-back arrow was &#x21A9;
+            mailIconSpan.style.cursor = "pointer"
+            mailIconSpan.addEventListener("click", function(){
+                document.getElementById("dmfor").value = profileData.Id
+                showDmingStatus()
+                showMainScreen()
+                focusPostText()
+            })
+
+            ptag.appendChild(mailIconSpan)
+
+            nameSpanWrapper.style.cursor = "pointer"
+            nameSpanWrapper.addEventListener("click", function(){
+                loadDms(profileData.Id, this)
+            })
+
         }
         atag = makeATag("&#x2718;", function (xProfileId) {
             return async function () {
@@ -235,7 +256,45 @@ function makeProfilePtag(profileData) {
         }(profileData.Id), true)
     }
     ptag.appendChild(atag)
-    return ptag
+    let divwrapper = document.createElement("div")
+    divwrapper.appendChild(ptag)
+    return divwrapper
+}
+
+function loadDms(profileId, btnDomEl) {
+    let dmContainer = document.getElementById(`dmscontainer-${profileId}`)
+    if (dmContainer) {
+        dmContainer.textContent = ""
+    } else {
+        dmContainer = document.createElement("div")
+        dmContainer.id = `dmscontainer-${profileId}`
+        dmContainer.classList.add("dmscontainer")
+        // dmContainer.classList.add("collapsed")
+        let btnContainerDiv = btnDomEl.parentElement.parentElement
+        btnContainerDiv.appendChild(dmContainer)
+    }
+    let dms = orderedDmPostsByInteracteeProfileId[profileId]
+    if (!dms) {
+        return
+    }
+    let ourName = profilesOfInterest[selectedIdentityProfileId].DisplayName
+    let theirName = profilesOfInterest[profileId].DisplayName
+    for (let k in orderedDmPostsByInteracteeProfileId[profileId]) {
+        let dm = orderedDmPostsByInteracteeProfileId[profileId][k]
+        let tempTag = document.createElement("p")
+        tempTag.classList.add(dm.From ? "from" : "to")
+        tempTag.classList.add("message")
+        tempTag.innerHTML = (dm.From ? theirName : ourName) + ": " + dm.PreviewText
+        let timeTag = document.createElement("p")
+        timeTag.classList.add(dm.From ? "from" : "to")
+        timeTag.classList.add("time")
+        timeTag.innerHTML = cheesyDate(dm.jsDate)
+        dmContainer.appendChild(tempTag)
+        dmContainer.appendChild(timeTag)
+        console.log(dm)
+    }
+
+    console.log(profileId, btnDomEl)
 }
 
 async function promptToFollowCurated() {
@@ -274,7 +333,7 @@ function cheesyDate(dateobj) {
     // return dateobj.toISOString().split('.')[0]+"Z" //cheesy, but works. i didnt invent it.
     return moment(dateobj).fromNow()
 }
-async function unsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, followprofileid, unfollowprofileid, likeofnodecid, unlikeofnodecid, retractionofnodecid, repostofnodecid) {
+async function unsignedGraphNodeForPost(pubkeyb64, text, previous, dmfor, inreplyto, followprofileid, unfollowprofileid, likeofnodecid, unlikeofnodecid, retractionofnodecid, repostofnodecid) {
 
     let profileId = await peerutil.peerid(pubkeyb64)
     if (!previous) {
@@ -282,7 +341,7 @@ async function unsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, fo
     }
 
     let ts = (new Date()).toISOString().split('.')[0]+"Z"
-    graphNode = {
+    let graphNode = {
         ver:   1,
         ProfileId: profileId,
         previous: previous,
@@ -290,9 +349,10 @@ async function unsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, fo
         Date: ts,
     }
 
-    if (text) {
+    let firstPostCid
+    if (text && !dmfor) {
         firstPostCid = await addContentsToIPFS(text)
-        firstPost = {
+        let firstPost = {
             MimeType: "text/plain",
             Cid:      firstPostCid,
             Date:     ts,
@@ -304,6 +364,20 @@ async function unsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, fo
         firstPost.Reply = inreplyToList //just one for now this way, multireply later.
         graphNode.post = firstPost
     }
+    if (text && dmfor) {
+        let encryptedCidToDmPostForRecip = await getEncryptedDmPostCidForCleartextToProfileId(dmfor, text, ts)
+        let encryptedCidToDmPostForSelf  = await getEncryptedDmPostCidForCleartextToProfileId(selectedIdentityProfileId, text, ts)
+        let encryptedRecipProfileId = await encryptMessage(selectedIdentityProfileId, dmfor)
+        // recip can see who sent it [0]
+        // we can get a copy out for ourselves [1]
+        // and when we see we sent this we will be able to figure out who we sent it to [2]
+        graphNode.Dm = [
+            arrayBufferToBase64String(encryptedCidToDmPostForRecip),
+            arrayBufferToBase64String(encryptedCidToDmPostForSelf),
+            arrayBufferToBase64String(encryptedRecipProfileId),
+        ]
+    }
+
     if (followprofileid) {
         graphNode.publicfollow = [followprofileid] //just one for now this way for follows as well.
     }
@@ -326,6 +400,18 @@ async function unsignedGraphNodeForPost(pubkeyb64, text, previous, inreplyto, fo
     return serializedUnsignedGraphNode
 }
 
+async function getEncryptedDmPostCidForCleartextToProfileId(profileId, clearText, ts) {
+    let dmCyphertextCid = await addContentsToIPFS(await encryptMessage(profileId, clearText))
+    let dmPost = {
+        MimeType: "text/plain",
+        Cid:      dmCyphertextCid,
+        Date:     ts,
+    }
+    let dmPostJson = JSON.stringify(dmPost)
+    let dmPostCid = await addContentsToIPFS(await encryptMessage(profileId, dmPostJson))
+    let encryptedDmPostCid = await encryptMessage(profileId, dmPostCid)
+    return encryptedDmPostCid
+}
 async function unsignedProfileWithFirstPost(pubkeyb64, UnsignedGraphNodeJson, Signatureb64, DisplayName, Bio, previous, UseIPNSDelegate) {
     graphNode = JSON.parse(UnsignedGraphNodeJson) // TODO just pass in the pre-json. at time of writing i'm writing drop in replacements that dont change the process or args. but the process can change if we are doing all this in the browser.
     graphNode.Signature = Signatureb64
@@ -673,7 +759,7 @@ async function fetchGraphNodeHistory(profile, trackLoadFolloweeInfo, multihistor
         // profileTipCache[profile["Id"]] = currentGn.Cid
 
         // gnReplyParents[currentGn.Cid] = currentGn
-
+        await pullDmOut(currentGn)
         addGnToTimeline(currentGn)
         fillPostPreviewInfo(currentGn).catch((e)=>{console.log("fillPostPreviewInfo had err", e)})
         fillRepostPreviewInfo(currentGn).catch((e)=>{console.log("fillRepostPreviewInfo had err", e)})
@@ -833,6 +919,7 @@ const keyOrder = {
         publicunlike: 10,
         Signature: 11,
         Date: 12,
+        Dm: 13,
 
         MimeType: 1,
         Cid: 2,

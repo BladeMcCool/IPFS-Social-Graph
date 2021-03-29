@@ -1,5 +1,6 @@
 var identities
 var selectedIdentity
+let selectedIdentityPrivKeyImportedForDecrypt
 var importPubkey
 let selectedIdentityProfileId
 let timelineUpdaterInterval
@@ -8,6 +9,7 @@ let superSecretModeEnabled = false
 let tlEntryTemplate
 
 let orderedTimelineElements = []
+let orderedDmPostsByInteracteeProfileId = {}
 let retractedCids = {} //map cid to person who retracted it. just need to only retract things that are done by their owners.
 let gnReplyParents = {}
 let repostedCids = {}
@@ -92,6 +94,7 @@ async function createProfilePost(noconfirmFollow) {
         "graphtip" : document.getElementById("graphtip").value,
         "profiletip" : document.getElementById("profiletip").value,
         "inreplyto" : document.getElementById("inreplyto").value,
+        "dmfor" : document.getElementById("dmfor").value,
         "followprofileid" : document.getElementById("followprofileid").value,
         "unfollowprofileid" : document.getElementById("unfollowprofileid").value,
         "likeofnodecid" : document.getElementById("likeofnodecid").value,
@@ -190,6 +193,7 @@ async function createProfilePost(noconfirmFollow) {
     if (!inputFlds["graphtip"]) { inputFlds["graphtip"] = null; }
     if (!inputFlds["profiletip"]) { inputFlds["profiletip"] = null; }
     if (!inputFlds["inreplyto"]) { inputFlds["inreplyto"] = null; }
+    if (!inputFlds["dmfor"]) { inputFlds["dmfor"] = null; }
     if (!inputFlds["followprofileid"]) { inputFlds["followprofileid"] = null; }
     if (!inputFlds["unfollowprofileid"]) { inputFlds["unfollowprofileid"] = null; }
     if (!inputFlds["likeofnodecid"]) { inputFlds["likeofnodecid"] = null; }
@@ -199,23 +203,24 @@ async function createProfilePost(noconfirmFollow) {
 
     useipnsdelegate = !sendprivkey
 
-    let payloadFieldsForUnsignedGraphnode = {
-        "text": inputFlds["text"],
-        "previous": inputFlds["graphtip"],
-        "inreplyto": inputFlds["inreplyto"],
-        "followprofileid": inputFlds["followprofileid"],
-        "unfollowprofileid": inputFlds["unfollowprofileid"],
-        "likeofnodecid": inputFlds["likeofnodecid"],
-        "unlikeofnodecid": inputFlds["unlikeofnodecid"],
-        "retractionofnodecid": inputFlds["retractionofnodecid"],
-        "repostofnodecid": inputFlds["repostofnodecid"],
-    }
+    // let payloadFieldsForUnsignedGraphnode = {
+    //     "text": inputFlds["text"],
+    //     "previous": inputFlds["graphtip"],
+    //     "inreplyto": inputFlds["inreplyto"],
+    //     "followprofileid": inputFlds["followprofileid"],
+    //     "unfollowprofileid": inputFlds["unfollowprofileid"],
+    //     "likeofnodecid": inputFlds["likeofnodecid"],
+    //     "unlikeofnodecid": inputFlds["unlikeofnodecid"],
+    //     "retractionofnodecid": inputFlds["retractionofnodecid"],
+    //     "repostofnodecid": inputFlds["repostofnodecid"],
+    // }
 
     // unsignedGraphNodeJson = await getUnsignedGraphNodeForPost(pubkeyb64, payloadFieldsForUnsignedGraphnode)
     unsignedGraphNodeJson = await unsignedGraphNodeForPost(
         pubkeyb64,
         inputFlds["text"],
         inputFlds["graphtip"],
+        inputFlds["dmfor"],
         inputFlds["inreplyto"],
         inputFlds["followprofileid"],
         inputFlds["unfollowprofileid"],
@@ -263,6 +268,7 @@ async function createProfilePost(noconfirmFollow) {
     document.getElementById("posttext").value = ""
     clearReply()
     clearFollow()
+    clearDmFor()
 
     // latestTimelineTextsJson = await getLatestTimelineTexts(pubkeyb64, updatedProfileCid)
     // console.log(latestTimelineTextsJson)
@@ -398,6 +404,57 @@ function hideFollowButtonsForProfileId(followProfileId) {
     }
 }
 
+async function pullDmOut(gnode) {
+    if (!gnode.Dm || gnode.Dm.length != 3) {
+        return
+    }
+    // if the gnode profile is OUR profile, then this node includes a DM we sent to someone. the 2nd element of the DM array will provide the info we need to put content into dms.
+    let dmPostCid
+    let encryptedDmPostCid
+    let interacteeProfileId
+    let toInteractee = false
+    if (gnode.ProfileId == selectedIdentityProfileId) {
+        encryptedDmPostCid = gnode.Dm[1]
+        console.log("try to pull out dm we sent")
+        interacteeProfileId = await decryptMessage(base64StringToArrayBuffer(gnode.Dm[2]))
+        toInteractee = true
+    } else {
+        encryptedDmPostCid = gnode.Dm[0]
+        interacteeProfileId = gnode.ProfileId
+    }
+
+    dmPostCid = await decryptMessage( base64StringToArrayBuffer(encryptedDmPostCid) )
+    if (!dmPostCid) {
+        console.log("pullDmOut saw dm that we could not decrypt the info of -- presumably not for us!")
+        return
+    }
+
+    let encryptedPostJson = await getCidContentsByGet(dmPostCid, true)
+    let decryptedPost
+    try {
+        let decryptedPostJson = await decryptMessage(encryptedPostJson)
+        decryptedPost = JSON.parse(decryptedPostJson)
+        decryptedPost.jsDate = new Date(decryptedPost.Date)
+        let encryptedPostContent = await getCidContentsByGet(decryptedPost.Cid, true)
+        decryptedPost.PreviewText = await decryptMessage(encryptedPostContent)
+        if (toInteractee) {
+            decryptedPost.To = true
+        } else {
+            decryptedPost.From = true
+        }
+    } catch(e) {
+        console.log("pullDmOut somehow we could get the dmPostCid but we couldnt decrypt to json the blob we found there ... *shrug*.")
+        return
+    }
+
+    if (!orderedDmPostsByInteracteeProfileId[interacteeProfileId]) {
+        orderedDmPostsByInteracteeProfileId[interacteeProfileId] = []
+    }
+    let dateCompare = (a, b) => {
+        return a.jsDate > b.jsDate ? -1 : 1
+    }
+    xbinaryInsert(orderedDmPostsByInteracteeProfileId[interacteeProfileId], decryptedPost, dateCompare, function(){})
+}
 
 function addGnToTimeline(gnode) {
     // let checkEntry = entry
@@ -1457,12 +1514,14 @@ function clearReply() {
     }
 }
 function clearUnmatchedReply() {
+    clearDmFor()
     if (document.getElementById("inreplyto").value != "" && document.getElementById("repostofnodecid").value != document.getElementById("inreplyto").value) {
         document.getElementById("inreplyto").value = ""
     }
     setpostingStatus()
 }
 function clearUnmatchedRepost() {
+    clearDmFor()
     if (document.getElementById("repostofnodecid").value != "" && document.getElementById("repostofnodecid").value != document.getElementById("inreplyto").value) {
         document.getElementById("repostofnodecid").value = ""
     }
@@ -1484,6 +1543,16 @@ function clearRepost() {
     }
 }
 
+function clearDmFor() {
+    document.getElementById("dmfor").value = ""
+    document.getElementById("dmingicon").style.display = "none";
+    document.getElementById("interactwith").innerHTML = ""
+}
+function clearDmForAndFocus() {
+    clearDmFor()
+    focusPostText()
+}
+
 function clearRepostAndFocus() {
     clearRepost()
     focusPostText()
@@ -1493,10 +1562,19 @@ function clearReplyAndFocus() {
     focusPostText()
 }
 
+function showDmingStatus() {
+    clearReply()
+    clearRepost()
+    setpostingStatus()
+}
+
 function getInteracteeProfileId() {
     let interacteeProfileId = profileIdByGnodeCid(document.getElementById("inreplyto").value)
     if (!interacteeProfileId) {
         interacteeProfileId = profileIdByGnodeCid(document.getElementById("repostofnodecid").value)
+    }
+    if (!interacteeProfileId) {
+        interacteeProfileId = document.getElementById("dmfor").value
     }
     return interacteeProfileId
 }
@@ -1532,6 +1610,14 @@ function setpostingStatus() {
     } else {
         document.getElementById("replyingicon").style.display = "none";
     }
+
+    if (document.getElementById("dmfor").value != "") {
+        document.getElementById("dmingicon").style.display = "";
+        showInteracteeName = true
+    } else {
+        document.getElementById("dmingicon").style.display = "none";
+    }
+
     //i think we should just clear the icons if we are not in the field.
     if (showInteracteeName) {
         let interactWithInfo = document.getElementById("interactwith")

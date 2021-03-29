@@ -82,7 +82,7 @@ async function getCidContentsByGet(cid) {
         for await (const chunk of file.content) {
             chunks.push(chunk)
         }
-        return arrayBufferToString(uint8ArrayConcat(chunks))
+        return uint8ArrayConcat(chunks)
     }
 }
 

@@ -10,6 +10,7 @@ async function setIdentity(keyname) {
     }
     console.log("setIdentity", keyname)
     selectedIdentity = keyname
+    orderedDmPostsByInteracteeProfileId = {}
     setSelectedIdentityProfileId()
     selectBox = document.getElementById("chooseident")
     if (selectBox.value != keyname) {
@@ -33,7 +34,7 @@ async function setIdentity(keyname) {
     pubTextarea.innerHTML = identity["pub"]
     privTextarea = document.getElementById("privkeyb64")
     privTextarea.innerHTML = identity["priv"]
-
+    selectedIdentityPrivKeyImportedForDecrypt = await importPrivkeyFromB64ForDecrypt(identity["priv"])
 
     // if (!identity["profileid"]) {
     //     //this will happen from making a new one.

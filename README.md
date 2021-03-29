@@ -1,3 +1,7 @@
+# Social App
+
+This software is a small social app with federation on top of IPFS. Shared universal timeline with posts from your curated bubble of followees, plus encrypted DMs. There is presently needed a small server component included here which does some IPNS stuff for the federation and provides profile info to get clients started. It also serves the ui as a mobile-friendly web page. Server operators can limit profile operations to those on an approved list, and bad profiles can be explicitly blocked via a block list.
+
 # IPFS Social Graph  
   
 An IPFS Social Graph. Create a social Profile, and use the RSA keys to sign new GraphNodes and Profile versions which link to their previous records immutably. Provide a Web UI to crawl this data using js-ipfs. Provide a server component to federate lists of updated profile tip information among network operators using a go-ipfs instance. 
