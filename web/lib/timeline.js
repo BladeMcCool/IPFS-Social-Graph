@@ -207,25 +207,25 @@ function makeProfilePtag(profileData) {
     let atag
 
     if (follows[profileData.Id]) {
-        if (followbacks[profileData.Id]) {
-            let mailIconSpan = document.createElement("span")
-            mailIconSpan.innerHTML = "&#x2709;" //come-back arrow was &#x21A9;
-            mailIconSpan.style.cursor = "pointer"
-            mailIconSpan.addEventListener("click", function(){
-                document.getElementById("dmfor").value = profileData.Id
-                showDmingStatus()
-                showMainScreen()
-                focusPostText()
-            })
-
-            ptag.appendChild(mailIconSpan)
-
-            nameSpanWrapper.style.cursor = "pointer"
-            nameSpanWrapper.addEventListener("click", function(){
-                loadDms(profileData.Id, this)
-            })
-
-        }
+        // if (followbacks[profileData.Id]) {
+        //     let mailIconSpan = document.createElement("span")
+        //     mailIconSpan.innerHTML = "&#x2709;" //come-back arrow was &#x21A9;
+        //     mailIconSpan.style.cursor = "pointer"
+        //     mailIconSpan.addEventListener("click", function(){
+        //         document.getElementById("dmfor").value = profileData.Id
+        //         showDmingStatus()
+        //         showMainScreen()
+        //         focusPostText()
+        //     })
+        //
+        //     ptag.appendChild(mailIconSpan)
+        //
+        //     nameSpanWrapper.style.cursor = "pointer"
+        //     nameSpanWrapper.addEventListener("click", function(){
+        //         loadDms(profileData.Id, this)
+        //     })
+        //
+        // }
         atag = makeATag("&#x2718;", function (xProfileId) {
             return async function () {
                 let actuallyunFollowed = await unfollow(xProfileId)
@@ -255,7 +255,28 @@ function makeProfilePtag(profileData) {
             }
         }(profileData.Id), true)
     }
+
     ptag.appendChild(atag)
+
+    if (follows[profileData.Id] && followbacks[profileData.Id]) {
+        let mailIconSpan = document.createElement("span")
+        mailIconSpan.innerHTML = "&#x2709;" //come-back arrow was &#x21A9;
+        mailIconSpan.style.cursor = "pointer"
+        mailIconSpan.addEventListener("click", function(){
+            document.getElementById("dmfor").value = profileData.Id
+            showDmingStatus()
+            showMainScreen()
+            focusPostText()
+        })
+        ptag.appendChild(document.createTextNode(" - "))
+        ptag.appendChild(mailIconSpan)
+
+        nameSpanWrapper.style.cursor = "pointer"
+        nameSpanWrapper.addEventListener("click", function(){
+            loadDms(profileData.Id, this)
+        })
+
+    }
     let divwrapper = document.createElement("div")
     divwrapper.appendChild(ptag)
     return divwrapper
@@ -263,9 +284,7 @@ function makeProfilePtag(profileData) {
 
 function loadDms(profileId, btnDomEl) {
     let dmContainer = document.getElementById(`dmscontainer-${profileId}`)
-    if (dmContainer) {
-        dmContainer.textContent = ""
-    } else {
+    if (!dmContainer) {
         dmContainer = document.createElement("div")
         dmContainer.id = `dmscontainer-${profileId}`
         dmContainer.classList.add("dmscontainer")
@@ -273,6 +292,12 @@ function loadDms(profileId, btnDomEl) {
         let btnContainerDiv = btnDomEl.parentElement.parentElement
         btnContainerDiv.appendChild(dmContainer)
     }
+
+    if (dmContainer.childNodes.length > 0) {
+        dmContainer.textContent = ""
+        return
+    }
+
     let dms = orderedDmPostsByInteracteeProfileId[profileId]
     if (!dms) {
         return
@@ -284,7 +309,9 @@ function loadDms(profileId, btnDomEl) {
         let tempTag = document.createElement("p")
         tempTag.classList.add(dm.From ? "from" : "to")
         tempTag.classList.add("message")
-        tempTag.innerHTML = (dm.From ? theirName : ourName) + ": " + dm.PreviewText
+        // tempTag.innerHTML = (dm.From ? theirName : ourName) + ": " + dm.PreviewText
+        tempTag.innerHTML = jdenticon.toSvg((dm.From ? profileId : selectedIdentityProfileId), 14) + dm.PreviewText
+
         let timeTag = document.createElement("p")
         timeTag.classList.add(dm.From ? "from" : "to")
         timeTag.classList.add("time")
