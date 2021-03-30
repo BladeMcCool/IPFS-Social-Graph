@@ -1,18 +1,27 @@
 #!/bin/bash
 set -e
 
+gobuild () {
+  cd src
+  go build -o ../bin/ciddag
+  cd ..
+}
+
 args=("$@")
 cmd=$@
 
 case $1 in
 
-build)
+gobuild)
   set -ex
-  cd src
-  go build -o ../bin/ciddag
+  gobuild
   ;;
 
 *)
+  if [ ! -f "./bin/ciddag" ]; then
+    echo "binary does not exist -- building it"
+    gobuild
+  fi
   ./bin/ciddag
 #  exec ${cmd}
   ;;

@@ -10,7 +10,7 @@ COPY ./web ./web
 COPY start.sh .
 WORKDIR /go/src/IPFS-Social-Graph/src
 RUN go get
-RUN go build -o ../bin/ciddag
+#RUN go build -o ../bin/ciddag
 WORKDIR /go/src/IPFS-Social-Graph/
 EXPOSE 4588
 EXPOSE 80

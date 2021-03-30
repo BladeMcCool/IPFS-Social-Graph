@@ -5,7 +5,7 @@ up:
 
 gobuild: COMPOSE_FILE=docker-compose.base.yml
 gobuild:
-	docker-compose run --rm ciddag build
+	docker-compose run --rm ciddag gobuild
 
 deps: COMPOSE_FILE=docker-compose.base.yml
 deps:
