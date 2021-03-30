@@ -2,18 +2,20 @@
 
 This software is a small social app with federation on top of IPFS. Shared universal timeline with posts from your curated bubble of followees, plus encrypted DMs. There is presently needed a small server component included here which does some IPNS stuff for the federation and provides profile info to get clients started. It also serves the ui as a mobile-friendly web page. Server operators can limit profile operations to those on an approved list, and bad profiles can be explicitly blocked via a block list.
 
+Demo Video: https://www.youtube.com/watch?v=7Mm2_1Xlpz0
+
+Live demo: https://ipfstoy.chws.ca
+
+Older Demo Videos
+ - Tech Demo 2; https://www.youtube.com/watch?v=6j9JGxelsZk
+ - Alpha Tech Demo: https://www.youtube.com/watch?v=8DjmmvUvuxE
+
 # IPFS Social Graph  
   
 An IPFS Social Graph. Create a social Profile, and use the RSA keys to sign new GraphNodes and Profile versions which link to their previous records immutably. Provide a Web UI to crawl this data using js-ipfs. Provide a server component to federate lists of updated profile tip information among network operators using a go-ipfs instance. 
-
-Watch a Demo Video: https://www.youtube.com/watch?v=6j9JGxelsZk
-
-Much earlier demo video (pre-alpha proof of concept): https://www.youtube.com/watch?v=8DjmmvUvuxE
-
-Live demo: https://ipfstoy.chws.ca
-  
+ 
 ### Build / run 
-Prequisites: Docker compose for quick start, or Golang 1.15.6 or compatible + existing IPFS node to build and run manually.
+Prerequisites For Quick Start: Docker compose
 
 Quick start with LetsEncrypt SSL Certs (replace your CIDDAG_WL_PROFILEIDS, CIDDAG_IPNS_FEDERATIONMEMBERS and CIDDAG_TLS_HOSTNAME with correct values, see further below for explanation of what the variables are for):
     
@@ -26,6 +28,7 @@ Quick start with Self Signed SSL Certs for local testing, will allow anyone with
     cd /home/blademccool/IPFS-Social-Graph/
 	openssl ecparam -genkey -name secp384r1 -out server.key
 	openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650
+	mv server.key server.crt compose/tlsdata/
     COMPOSE_FILE=docker-compose.base.yml make build
     COMPOSE_FILE=docker-compose.base.yml CIDDAG_IPNS_FEDERATIONMEMBERS="QmZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxDgL9jPvb4VBh" make up
 
@@ -39,7 +42,8 @@ A comma separated list of ProfileIds which will be used to limit the users who c
 It would be a domain name that you control which you can point at the IP where you are running the server at and then LetsEncrypt will be able to do some auto-magic to set your TLS certificates up. See comments in code for more info. IMPORTANT: the crypto.subtle api is not available to remote clients without TLS enabled, which is why this is critical that the web ui be served via TLS.
 
 ##### Manual build notes (if not doing docker-compose method above.)
-
+Prerequisites for manual build, or Golang 1.15.6 or compatible + existing IPFS node to build and run manually.
+ 
 Below are using example paths for the project and go resource directories. You will need to fix according to your system. Below we will start an IPFS node which will listen for API on port 7767, get dependencies for the golang project, build the ciddag binary from source using golang 1.15.6 and then run it set to provide a ui via http on port 4588, and to communicate with the running IPFS node on its port 7767. Leave the CIDDAG_TLS_HOSTNAME blank for local http ui on the port specified by CIDDAG_HTTP_PORT container environment var (default 4588). Set a value of a hostname that you control otherwise, and it will do automatic "Let's Encrypt" setup for the TLS cert for the domain. It will NOT WORK over https without a valid cert because otherwise the browser crypto key management api is unavailable.
 
 Start IPFS node:

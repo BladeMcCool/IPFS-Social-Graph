@@ -49,10 +49,13 @@ services:
     volumes:
       - ./compose/ipfs0:/data/ipfs
       - ./compose/tlsdata:/data/tls
+      - ./src:/go/src/IPFS-Social-Graph/src
+      - ./web:/go/src/IPFS-Social-Graph/web
+      - ./bin:/go/src/IPFS-Social-Graph/bin
     ports:
       - "4588:4588"
       - "80:80"
-      - "443:443"
+      - "4443:4443"
 
   wait_for_deps:
     image: dadarek/wait-for-dependencies

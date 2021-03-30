@@ -3,6 +3,10 @@ up:
 	docker-compose run --rm wait_for_deps
 	docker-compose up -d ciddag
 
+gobuild: COMPOSE_FILE=docker-compose.base.yml
+gobuild:
+	docker-compose run --rm ciddag build
+
 deps: COMPOSE_FILE=docker-compose.base.yml
 deps:
 	docker-compose up -d ipfs0
