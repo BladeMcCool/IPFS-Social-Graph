@@ -33,7 +33,7 @@ type GraphNode struct {
 
 	Signature []byte
 	Date *time.Time `json:",omitempty"`
-	Dm []byte `json:",omitempty"`
+	Dm [][]byte `json:",omitempty"`
 
 	// anyone could just lie about the date so maybe
 	// the concept of timestamp oracles could be used somehow

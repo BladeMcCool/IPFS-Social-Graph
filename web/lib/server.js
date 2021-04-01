@@ -1,4 +1,4 @@
-var serviceBaseUrl = ""
+let serviceBaseUrl = ""
 
 async function loadServiceBaseUrl() {
     try {
@@ -26,7 +26,7 @@ async function saveServiceBaseUrl() {
 }
 
 async function cancelCurrentHistoryRequest() {
-    historyXhr = requestTracker[serviceBaseUrl + "/service/history"]
+    let historyXhr = requestTracker[serviceBaseUrl + "/service/history"]
     if (historyXhr == undefined) { return }
     console.log("aborting current history request")
     historyXhr.abort()
@@ -65,9 +65,9 @@ async function getUnsignedProfileWithFirstPost(pubkeyb64, unsignedGraphNodeJson,
     if (!useipnsdelegate) {
         useipnsdelegate = false
     }
-    payload = {"pubkey":pubkeyb64, "useipnsdelegate": useipnsdelegate, "unsignedGraphNodeJson":unsignedGraphNodeJson, "signatureb64":signatureb64, "displayname":displayname, "bio":bio, "previous": previous}
+    let payload = {"pubkey":pubkeyb64, "useipnsdelegate": useipnsdelegate, "unsignedGraphNodeJson":unsignedGraphNodeJson, "signatureb64":signatureb64, "displayname":displayname, "bio":bio, "previous": previous}
     console.log("send payload to unsignedProfileWithFirstPost (method2) like", JSON.stringify(payload))
-    result = await makeRequest("POST", serviceBaseUrl + "/service/unsignedProfileWithFirstPost", payload)
+    let result = await makeRequest("POST", serviceBaseUrl + "/service/unsignedProfileWithFirstPost", payload)
     console.log("got unsignedProfileWithFirstPost (method2) result like:", result)
     return result
 }
@@ -79,7 +79,7 @@ async function updateProfileCidOnServer(profileJson, profileCid, IPNSDelegate, p
     }
     payload.Signature = await getSignature(privkeyb64, profileCid+IPNSDelegate)
     console.log("updateProfileCidOnServer send payload like", JSON.stringify(payload))
-    result = await makeRequest("POST", serviceBaseUrl + "/service/updateProfileCid", payload)
+    let result = await makeRequest("POST", serviceBaseUrl + "/service/updateProfileCid", payload)
     console.log("got updateProfileCidOnServer result like:", result)
     return result
 }
@@ -90,12 +90,6 @@ async function getPublishedProfileCid(pubkeyb64, privkeyb64, unsignedProfileJson
         console.log("get published profile cid: no data - do nothing")
         return
     }
-    if (!profiletip) {
-        profiletip = null
-    }
-    if (!profiletip) {
-        profiletip = null
-    }
     if (!privkeyb64) {
         privkeyb64 = null
         console.log("we are NOT sending the private key to the server")
@@ -104,9 +98,9 @@ async function getPublishedProfileCid(pubkeyb64, privkeyb64, unsignedProfileJson
     }
 
 
-    payload = {"pubkey":pubkeyb64, "privkey":privkeyb64, "unsignedProfileJson":unsignedProfileJson, "signatureb64":profileSigb64}
+    let payload = {"pubkey":pubkeyb64, "privkey":privkeyb64, "unsignedProfileJson":unsignedProfileJson, "signatureb64":profileSigb64}
     console.log("send payload to method3 like", payload)
-    result = await makeRequest("POST", serviceBaseUrl + "/service/publishedProfileCid", payload)
+    let result = await makeRequest("POST", serviceBaseUrl + "/service/publishedProfileCid", payload)
     console.log("got method3 result like:", result)
     return result
 }
@@ -123,10 +117,10 @@ async function getLatestTimelineTexts(pubkeyb64, profiletip) {
         console.log("getLatestTimelineTexts: no data - do nothing")
         return "[]"
     }
-    payload = {"pubkey":pubkeyb64, "profiletip":profiletip}
+    let payload = {"pubkey":pubkeyb64, "profiletip":profiletip}
     console.log("send payload to get history like", payload)
     await cancelCurrentHistoryRequest()
-    result = await makeRequest("POST", serviceBaseUrl + "/service/history", payload, true)
+    let result = await makeRequest("POST", serviceBaseUrl + "/service/history", payload, true)
     // console.log("got history result like:", result)
     return result
 }

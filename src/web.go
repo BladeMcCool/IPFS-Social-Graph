@@ -93,9 +93,6 @@ func (s *APIService) getHttpHandler(useauthMiddleware bool) http.Handler {
 	router.HandleFunc("/experiment.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, filePath+"/experiment.html")
 	})
-	router.HandleFunc("/experiment2.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, filePath+"/experiment2.html")
-	})
 	router.PathPrefix("/lib").Handler(http.StripPrefix("/lib", http.FileServer(http.Dir(filePath+"/lib"))))
 
 	authedRouter := router.PathPrefix("/service").Subrouter()

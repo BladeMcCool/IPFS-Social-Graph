@@ -12,7 +12,7 @@ async function setIdentity(keyname) {
     selectedIdentity = keyname
     orderedDmPostsByInteracteeProfileId = {}
     setSelectedIdentityProfileId()
-    selectBox = document.getElementById("chooseident")
+    let selectBox = document.getElementById("chooseident")
     if (selectBox.value != keyname) {
         for (k = 0; k < selectBox.options.length; k++) {
             option = selectBox.options[k]
@@ -123,17 +123,17 @@ async function initIdentity() {
 async function newIdentity(newidentname, dispname, bio, promptToFollowCurated) {
     console.log('newIdentity: identities is: ', identities);
 
-    keypair = await generateKey()
+    let keypair = await generateKey()
     console.log("keypair", keypair)
-    spki = await window.crypto.subtle.exportKey('spki', keypair.publicKey)
+    let spki = await window.crypto.subtle.exportKey('spki', keypair.publicKey)
     console.log(spki)
-    spkib64 = arrayBufferToBase64String(spki)
+    let spkib64 = arrayBufferToBase64String(spki)
     console.log("pubkey b64 in PKIX", spkib64)
     console.log("\n\n")
-    pkcs8 = await window.crypto.subtle.exportKey('pkcs8', keypair.privateKey)
-    pkcs8b64 = arrayBufferToBase64String(pkcs8)
+    let pkcs8 = await window.crypto.subtle.exportKey('pkcs8', keypair.privateKey)
+    let pkcs8b64 = arrayBufferToBase64String(pkcs8)
     console.log("privkey b64 in pkcs8", pkcs8b64)
-    profileId = await peerutil.peerid(spkib64)
+    let profileId = await peerutil.peerid(spkib64)
 
 
     // if (!await loadRecaptchaScript(profileId)) {
@@ -149,7 +149,7 @@ async function newIdentity(newidentname, dispname, bio, promptToFollowCurated) {
         return
     }
 
-    newIdentitySettings = {
+    let newIdentitySettings = {
         "pub":spkib64,
         "priv":pkcs8b64,
         "dispname": dispname ? dispname : "",
@@ -171,7 +171,7 @@ async function newIdentity(newidentname, dispname, bio, promptToFollowCurated) {
 }
 
 function addIdentityToChoices(keyname) {
-    select = document.getElementById('chooseident');
+    let select = document.getElementById('chooseident');
     var opt = document.createElement('option');
     opt.value = keyname;
     opt.innerHTML = keyname;
@@ -179,7 +179,7 @@ function addIdentityToChoices(keyname) {
 }
 
 function removeSelectedIdentFromSelect(confirmRemoval){
-    selectBox = document.getElementById("chooseident")
+    let selectBox = document.getElementById("chooseident")
     if (!selectBox.value) {
         return
     }
@@ -187,12 +187,10 @@ function removeSelectedIdentFromSelect(confirmRemoval){
     if (confirmRemoval && !confirm("for real? can't be undone.")) {
         return
     }
-    removeIdentname = selectBox.value
+    let removeIdentname = selectBox.value
     console.log("do it to", removeIdentname)
     selectBox.remove(selectBox.selectedIndex)
-
     selectBox.selectedIndex = 0
-
 }
 
 async function deleteSelectedIdentity() {
@@ -208,7 +206,7 @@ function scrapeSettingsIntoSelectedIdentity() {
         console.log("scrapeSettingsIntoSelectedIdentity: no currently selected identity, not doing anything.")
         return
     }
-    identity = identities[selectedIdentity]
+    let identity = identities[selectedIdentity]
     identity["dispname"] = document.getElementById("dispname").value
     identity["bio"] = document.getElementById("bio").value
     identity["graphtip"] = document.getElementById("graphtip").value
@@ -241,14 +239,13 @@ async function unselectIdentity() {
     }
 
     resetTextTimelineArea()
-    // displayTimelineTextsFromServer("[]")
     document.getElementById("currentprofile_detail").style.display = "none"
     document.getElementById("importprivkeyb64_container").style.display = "inline"
 }
 
 async function renameSelectedIdentity() {
     console.log('newIdentity: identities is: ', identities);
-    newidentname = getNewIdentName()
+    let newidentname = getNewIdentName()
     if (newidentname == undefined) {
         return
     }
@@ -266,7 +263,7 @@ async function renameSelectedIdentity() {
     clearIdentName()
 }
 function getNewIdentName() {
-    newidentname = document.getElementById("newidentname").value.trim()
+    let newidentname = document.getElementById("newidentname").value.trim()
     if (!newidentname) {
         alert("Please type a name for it")
         console.log("not creating identity with no name")
@@ -280,12 +277,12 @@ function getNewIdentName() {
     return newidentname
 }
 async function importKeyAsIdentity() {
-    newidentname = getNewIdentName()
+    let newidentname = getNewIdentName()
     if (newidentname == undefined) {
         return
     }
 
-    pkcs8b64 = document.getElementById("importprivkeyb64").value.trim()
+    let pkcs8b64 = document.getElementById("importprivkeyb64").value.trim()
     // console.log("privkey b64 in pkcs8", pkcs8b64)
     var spkib64
     try {
@@ -298,14 +295,14 @@ async function importKeyAsIdentity() {
     console.log("pubkey b64 in PKIX", spkib64)
     importPubkey = spkib64
 
-    profileId = await peerutil.peerid(importPubkey)
+    let profileId = await peerutil.peerid(importPubkey)
     console.log("trying to import profile with id:", profileId)
-    ipnsDelegate = await IPNSDelegateName()
+    let ipnsDelegate = await IPNSDelegateName()
     console.log("trying to import profile .. got ipnsdelegate from the currently configured server:", ipnsDelegate)
-    profileTipData = await profileBestTip(profileId)
+    let profileTipData = await profileBestTip(profileId)
     console.log("trying to import profile with data like:", profileTipData)
 
-    newIdentitySettings = {
+    let newIdentitySettings = {
         "pub":spkib64,
         "priv":pkcs8b64,
         "dispname":profileTipData ? profileTipData["ProfileData"]["DisplayName"] : "",
@@ -325,6 +322,188 @@ async function importKeyAsIdentity() {
 }
 
 
+function setSelectedIdentityProfileId() {
+    if (selectedIdentity && identities[selectedIdentity]) {
+        selectedIdentityProfileId = identities[selectedIdentity]["profileid"]
+    } else {
+        selectedIdentityProfileId = null
+    }
+}
+
+async function reloadSession() {
+    await loadServiceBaseUrl()
+    console.log('localforage is: ', localforage);
+    console.log('reloadSession: identities is: ', identities);
+    try {
+        identities = await localforage.getItem('identities');
+        selectedIdentity = await localforage.getItem('selectedIdentity');
+        if (selectedIdentity) {
+            setSelectedIdentityProfileId()
+        }
+        console.log("identities already there", identities);
+        console.log("selectedIdentity already there", selectedIdentity);
+    } catch (err) {
+        console.log("load oops:", err);
+    }
+    if (!identities || Object.keys(identities).length === 0) {
+        console.log("no existing identities found in indexeddb");
+        identities = {}
+        await initIdentity()
+        return
+    }
+    if (!identities[selectedIdentity]) {
+        selectedIdentity = null
+        setSelectedIdentityProfileId()
+    }
+    for (var idname of Object.keys(identities)) {
+        addIdentityToChoices(idname)
+    }
+    await setIdentity(selectedIdentity)
+}
+
+async function createProfilePost(noconfirmFollow) {
+    if (!selectedIdentity) {
+        alert("select an identity first please")
+        return false
+    }
+
+    let pubkeyb64 = identities[selectedIdentity]["pub"]
+    let privkeyb64 = identities[selectedIdentity]["priv"]
+
+    let inputFlds = {
+        "text" : document.getElementById("posttext").value.trim(),
+        "dispname" : document.getElementById("dispname").value,
+        "bio" : document.getElementById("bio").value,
+        "graphtip" : document.getElementById("graphtip").value,
+        "profiletip" : document.getElementById("profiletip").value,
+        "inreplyto" : document.getElementById("inreplyto").value,
+        "dmfor" : document.getElementById("dmfor").value,
+        "followprofileid" : document.getElementById("followprofileid").value,
+        "unfollowprofileid" : document.getElementById("unfollowprofileid").value,
+        "likeofnodecid" : document.getElementById("likeofnodecid").value,
+        "unlikeofnodecid" : document.getElementById("unlikeofnodecid").value,
+        "retractionofnodecid" : document.getElementById("retractionofnodecid").value,
+        "repostofnodecid" : document.getElementById("repostofnodecid").value,
+    }
+
+    // sendprivkey = document.getElementById("sendprivkey").checked
+    let sendprivkey = false // disabling this for now. ipns publish is way to slow and this is super insecure anyway.
+
+    let confirmFields = {
+        // "followprofileid":["follow", clearFollow],
+        "unfollowprofileid":["unfollow", clearUnfollow],
+        "retractionofnodecid":["retract", clearRetraction],
+    }
+
+    if (noconfirmFollow) {
+        clearFollow()
+    } else {
+        confirmFields["followprofileid"] = ["follow", clearFollow]
+    }
+
+    for (var key of Object.keys(confirmFields)) {
+        let clearFunc = confirmFields[key][1]
+        clearFunc()
+        if (inputFlds[key]) {
+            let confirmText = confirmFields[key][0]
+            if (!confirm("really " + confirmText + " " + inputFlds[key] + "?")) {
+                return false
+            }
+        }
+    }
+
+    clearRepost()
+    clearLike()
+    clearUnlike()
+
+    let hasRequiredFld = false
+    let requireOneOfFields = [
+        "text", "followprofileid", "unfollowprofileid", "repostofnodecid", "retractionofnodecid", "likeofnodecid", "unlikeofnodecid",
+    ]
+    for (var i = 0; i < requireOneOfFields.length; i++) {
+        if (inputFlds[requireOneOfFields[i]]) {
+            hasRequiredFld = true
+            break
+        }
+    }
+
+    if (!hasRequiredFld) {
+        alert("Please type some text for a post, follow/unfollow another profileid or otherwise set up some action to perform.")
+        focusPostText()
+        return false
+    }
+
+    if (!inputFlds["text"] && inputFlds["inreplyto"]) {
+        console.log("clearing replyto that had no text.")
+        clearReply()
+    }
+
+    if (!inputFlds["graphtip"]) { inputFlds["graphtip"] = null; }
+    if (!inputFlds["profiletip"]) { inputFlds["profiletip"] = null; }
+    if (!inputFlds["inreplyto"]) { inputFlds["inreplyto"] = null; }
+    if (!inputFlds["dmfor"]) { inputFlds["dmfor"] = null; }
+    if (!inputFlds["followprofileid"]) { inputFlds["followprofileid"] = null; }
+    if (!inputFlds["unfollowprofileid"]) { inputFlds["unfollowprofileid"] = null; }
+    if (!inputFlds["likeofnodecid"]) { inputFlds["likeofnodecid"] = null; }
+    if (!inputFlds["unlikeofnodecid"]) { inputFlds["unlikeofnodecid"] = null; }
+    if (!inputFlds["retractionofnodecid"]) { inputFlds["retractionofnodecid"] = null; }
+    if (!inputFlds["repostofnodecid"]) { inputFlds["repostofnodecid"] = null; }
+
+    let useipnsdelegate = !sendprivkey
+
+    let unsignedGraphNodeJson = await unsignedGraphNodeForPost(
+        pubkeyb64,
+        inputFlds["text"],
+        inputFlds["graphtip"],
+        inputFlds["dmfor"],
+        inputFlds["inreplyto"],
+        inputFlds["followprofileid"],
+        inputFlds["unfollowprofileid"],
+        inputFlds["likeofnodecid"],
+        inputFlds["unlikeofnodecid"],
+        inputFlds["retractionofnodecid"],
+        inputFlds["repostofnodecid"]
+    )
+    console.log("got unsigned gn like:", unsignedGraphNodeJson)
+    let signatureb64 = await getSignature(privkeyb64, unsignedGraphNodeJson)
+    console.log("got signature b64 like:", signatureb64)
+
+    let unsignedProfileJson = await unsignedProfileWithFirstPost(pubkeyb64, unsignedGraphNodeJson, signatureb64, inputFlds["dispname"], inputFlds["bio"], inputFlds["profiletip"], useipnsdelegate)
+    console.log("got unsigned profile json like:", unsignedProfileJson)
+
+    let unsignedProfile = JSON.parse(unsignedProfileJson)
+    document.getElementById("graphtip").value = unsignedProfile.GraphTip
+    document.getElementById("profileid").value = unsignedProfile.Id
+    document.getElementById("ipnsdelegate").value = unsignedProfile.IPNSDelegate ? unsignedProfile.IPNSDelegate : ""
+
+    let profileSigb64 = await getSignature(privkeyb64, unsignedProfileJson)
+    console.log("got signature for that like:", profileSigb64)
+    let privkeyb64foripns = sendprivkey ? privkeyb64 : null
+
+    let updatedProfileCid = await publishedProfileCid(pubkeyb64, privkeyb64, unsignedProfileJson, profileSigb64, unsignedProfile.IPNSDelegate ? unsignedProfile.IPNSDelegate : "")
+    document.getElementById("profiletip").value = updatedProfileCid
+
+    scrapeSettingsIntoSelectedIdentity() //so that when we updateSavedIdentites we keep whatever was in the fields.
+    await updateSavedIdentites(identities)
+
+    if (inputFlds["followprofileid"]) {
+        delete unfollows[inputFlds["followprofileid"]] //otherwise spidering code will not re-add anything that was previously unfollowed.
+        follows[inputFlds["followprofileid"]] = true
+    }
+    if (inputFlds["unfollowprofileid"]) {
+        delete follows[inputFlds["unfollowprofileid"]] //otherwise spidering code will not un-add anything that was previously followed.
+        unfollows[inputFlds["unfollowprofileid"]] = true
+    }
+
+    document.getElementById("posttext").value = ""
+    clearReply()
+    clearFollow()
+    clearDmFor()
+
+    await updateJsTimeline()
+    return true
+}
+
 async function chooseIdentity(keyname) {
     // await cancelCurrentHistoryRequest()
     scrapeSettingsIntoSelectedIdentity()
@@ -339,10 +518,11 @@ async function chooseIdentity(keyname) {
 
 async function updateSavedIdentites(updatedIdentities) {
     try {
-        value = await localforage.setItem('identities', updatedIdentities);
+        let value = await localforage.setItem('identities', updatedIdentities);
         console.log("updated identities. total entries: ", Object.keys(value).length);
         // console.log(JSON.stringify(value))
     } catch (err) {
         console.log("set ooops", err);
     }
 }
+

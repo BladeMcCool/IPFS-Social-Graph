@@ -1,0 +1,355 @@
+.wrapper {
+    /*border: 2px solid red;*/
+    display: grid;
+    height: 100%;
+    /*overflow-y: hidden;*/
+    /*grid-template-columns: 50px auto;*/
+    grid-template-rows: 50px 1fr;
+    /*grid-template-columns: 50px minmax(0, 1fr);*/
+    /*grid-template-rows: 50px;*/
+    /*overflow-y: hidden*/
+    max-width: 500px;
+    margin: 0 auto;
+}
+/*div.wrapper  { border: 0px solid black; }*/
+/*.wrapper .hamburgers {*/
+/*    grid-row-start: 1;*/
+/*    grid-row-end: 3;*/
+/*}*/
+/*.tlentry div {border: 0px solid red; }*/
+.tlentry {
+    /*border: 10px solid black;*/
+    display: grid;
+    /*grid-template-columns: 50px auto;*/
+    grid-template-columns: 50px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    margin-bottom: 0px;
+    padding-bottom: 0px;
+    /*grid-template-rows: 10% 80% 10%;*/
+}
+#rightpane {
+    padding-left: 7px;
+    /*border: 5px solid pink;*/
+    /*max-height: 100%;*/
+    overflow: hidden
+}
+#memberspane {
+    /*margin-right: 7px;*/
+    padding-right: 7px;
+    overflow-y: scroll;
+    height: 100%;
+}
+
+div#memberspane p {
+    font-size: 12px;
+    padding-top: 2px;
+}
+div#followees {
+    margin-top: 7px;
+}
+
+div#followees p {
+    margin: 0px;
+}
+div#followees div.dmscontainer { overflow: hidden; } /* https://stackoverflow.com/questions/2062258/floating-elements-within-a-div-floats-outside-of-div-why */
+
+div#followees .dmscontainer p {
+    max-width: 80%;
+    padding: 5px 5px 3px 5px;
+    border-radius: 3px;
+}
+div#followees .dmscontainer p svg {
+    vertical-align: middle;
+    display: inline-block;
+    /*width:20px;*/
+    /*height: 20px;*/
+    border: 0px solid black;
+    /*margin: auto;*/
+    margin-right: 5px;
+    margin-bottom: 2px;
+    background-color: white;
+}
+
+div#followees .dmscontainer p.from.message {
+    background-color: lightgray;
+    clear:both;
+    float:left;
+}
+div#followees .dmscontainer p.time {
+    padding-top: 2px;
+    font-size: 9px;
+}
+div#followees .dmscontainer p.from.time {
+    clear:both;
+    float:left;
+}
+div#followees .dmscontainer p.to.message {
+    background-color: lightblue;
+    clear:both;
+    float:right;
+}
+div#followees .dmscontainer p.to.time {
+    clear:both;
+    float:right;
+}
+
+div#serverlist p {
+    margin: 0px;
+}
+
+
+#menuthing {
+    height: 100%;
+    overflow-y: scroll;
+    border: 0px solid black;
+    font-size: 8px;
+}
+#menuthing p { font-size: 10px; }
+.tlentry .tallboy {
+    grid-row-start: 2;
+    grid-row-end: 6;
+}
+.tlentry .replyrow {
+    grid-column: 1 / span 2;
+}
+.tlentry .repostnotespan {
+    grid-column-start: 1;
+    grid-column-end: 3;
+    padding: 0px;
+    /*height: 18px;*/
+}
+
+/*.tlentry .buttonarea { padding-top: 5px; }*/
+/*.tlentry .buttonarea a {*/
+/*  text-decoration: none;*/
+/*  margin-right: 5px;*/
+/*}*/
+.stdpostinfo { font-size: 10px; font-weight: bold; padding-top: 3px; }
+.stdpostinfo .tsspan { font-weight: normal;}
+.stdpostcontent { font-size: 16px; padding-top: 2px; padding-bottom: 4px; overflow-wrap: break-word;  }
+.repostnotespan { font-size: 10px; font-weight: bold; padding-top: 3px; }
+.repostnotespan .tsspan { font-weight: normal;}
+.repostcontainer span { font-size: 10px; font-weight: bold; }
+.repostcontainer { overflow-wrap: break-word; }
+.reposteets { font-size: 10px; font-weight: normal; }
+
+div.hamburgers {
+    background-color: gray;
+    color: lightgray;
+    padding-right: 10px;
+    /*width: 100%;*/
+}
+/*.hamburgers div { border: 1px solid red; }*/
+/*.hamburgers p { border: 1px solid red; }*/
+
+.profilename p svg {
+    background-color: white;
+    padding: 2px;
+    /*border: 1px;*/
+    border-radius: 3px;
+    /*padding-top: px;*/
+    margin-right: 7px;
+}
+div.profilename {
+    max-width: 50vw;
+    overflow-x: hidden;
+    white-space: nowrap;
+}
+
+.iteractionbuttons {
+    text-align: center;
+    float: right;
+    font-size: 10px;
+    padding-top: 5px;
+    max-width: 24vw;
+    overflow-x: hidden;
+    white-space: nowrap;
+}
+.iteractionbuttons span.btn {
+    margin-right: 5px;
+    cursor:pointer;
+}
+
+.iteractionbuttons span svg {
+    background-color: white;
+    padding: 2px;
+    /*border: 1px;*/
+    border-radius: 2px;
+    /*padding-top: px;*/
+    margin-right: 4px;
+}
+
+.menubutton {
+    text-align: center;
+    cursor:pointer;
+    float: right;
+    margin-left: 20px;
+}
+
+.composearea {
+    margin-top: 7px;
+    display: grid;
+    /*grid-template-columns: minmax(0, 1fr) 50px;*/
+    grid-template-columns: auto 50px;
+    /*grid-template-rows: 20px auto;*/
+}
+
+.composearea div { border: 0px solid black; }
+.composearea input {
+    border: 1px solid lightgray;
+    width: 100%;
+    height: 100%;
+    font-size: 20px;
+}
+.repostcontainer {
+    border-radius: 3px;
+    margin-right: 7px;
+}
+
+.mainuipane {
+    height: 100%;
+    display: grid;
+    grid-template-rows: 35px 1fr;
+    /*overflow-y: hidden;*/
+}
+
+div .tlcontainer {
+    margin-top: 7px;
+    /*border-top: 1px solid lightgray;*/
+    /*padding-top: 7px;*/
+    /*border: 2px solid orange;*/
+    /*max-height: 100vh;*/
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+/*.mainuipane { border: 10px solid orange }*/
+body {
+    font-family: sans-serif;
+    font-size: 10pt;
+    margin: 0;
+    padding: 0;
+    /*overscroll-behavior: contain;*/
+    /*overflow-y: hidden;*/
+}
+a { text-decoration: none }
+
+div.tlentry { margin-right: 7px; }
+/*.tlentry  div { border: 0px solid green; }*/
+.tlentry svg.bigicon { width: 50px; height: 50px; }
+svg.smallicon { vertical-align: middle; display: inline-block; width:20px; height: 20px; border: 0px solid black; margin: auto; }
+svg.smallericon { vertical-align: middle; display: inline-block; width:15px; height: 15px; border: 0px solid black; margin: auto; }
+
+.collapsed {
+    /*border: 2px solid blue;*/
+    background: #fff;
+    overflow: hidden;
+
+    transition: all .5s ease-in-out;
+    line-height: 0;
+    padding: 0;
+    border: 0;
+    color: transparent;
+
+    margin-top: 0px;
+    margin-bottom: 0px;
+    border: 0px;
+}
+.collapsed .buttonarea a {
+    color: transparent !important;
+    transition: color .5s ease-in-out;
+}
+.collapsed .replyrow {
+    padding-top: 0px !important;
+    transition: color .5s ease-in-out;
+}
+.collapsed .repostcontainer {
+    border: 0px solid lightseagreen !important;
+    transition: border .5s ease-in-out;
+}
+
+.collapsed svg.bigicon {
+    height: 0px !important;
+    transition: height .5s ease-in-out;
+}
+.collapsed svg.smallicon {
+    height: 0px !important;
+    transition: height .5s ease-in-out;
+}
+.expanded {
+    transition: all .5s ease-in-out;
+    margin-bottom: 7px;
+    border: 1px solid lightseagreen;
+    border-radius: 5px;
+    line-height: 1.1;
+    padding-top: 0em;
+    padding-bottom: 0em;
+    color: black;
+}
+.expanded .replyrow {
+    padding-top: 10px;
+    transition: padding-top .5s ease-in-out;
+}
+.expanded .buttonarea a {
+    color: black;
+    transition: color .5s ease-in-out;
+}
+.expanded svg.bigicon {
+    height: 50px;
+    transition: height .5s ease-in-out;
+}
+.expanded svg.smallicon {
+    height: 20px;
+    transition: height .5s ease-in-out;
+}
+.expanded .repostcontainer {
+    border: 1px solid lightseagreen;
+    transition: border .5s ease-in-out;
+}
+
+.lds-ring {
+    display: inline-block;
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+.lds-ring div {
+    box-sizing: border-box;
+    display: block;
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    margin: 8px;
+    border: 8px solid lightseagreen;
+    border-radius: 50%;
+    animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    border-color: lightseagreen transparent transparent transparent;
+}
+.lds-ring div:nth-child(1) {
+    animation-delay: -0.45s;
+}
+.lds-ring div:nth-child(2) {
+    animation-delay: -0.3s;
+}
+.lds-ring div:nth-child(3) {
+    animation-delay: -0.15s;
+}
+@keyframes lds-ring {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.spinnercontainer {
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+    text-align: center;
+}
+
+/*reference because i will _never_ remember this.*/
+/*padding: <padding-top> || <padding-right> || <padding-bottom> || <padding-left>*/

@@ -10,7 +10,8 @@ let ipfs
 async function startIpfs() {
     const options = {
         start: true,
-        silent: true
+        silent: true,
+        // preload: { enabled: false } // <-- turning this off i think will reduce the network spam but i think what its doing is probably beneficial for the data availability in the network.
     }
     ipfs = await IPFS.create(options)
     ipfsStarted = true
