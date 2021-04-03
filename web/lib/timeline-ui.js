@@ -13,25 +13,105 @@ async function pullDmOut(gnode) {
         return
     }
     // if the gnode profile is OUR profile, then this node includes a DM we sent to someone. the 2nd element of the DM array will provide the info we need to put content into dms.
-    let dmPostCid
-    let encryptedDmPostCid
-    let interacteeProfileId
-    let toInteractee = false
-    if (gnode.ProfileId == selectedIdentityProfileId) {
-        encryptedDmPostCid = gnode.Dm[1]
-        console.log("try to pull out dm we sent")
-        interacteeProfileId = await decryptMessage(base64StringToArrayBuffer(gnode.Dm[2]))
-        toInteractee = true
-    } else {
-        encryptedDmPostCid = gnode.Dm[0]
-        interacteeProfileId = gnode.ProfileId
-    }
 
-    dmPostCid = await decryptMessage( base64StringToArrayBuffer(encryptedDmPostCid) )
-    if (!dmPostCid) {
-        console.log("pullDmOut saw dm that we could not decrypt the info of -- presumably not for us!")
+    // return
+
+    let encryptedAccessBundle
+    let encryptedRecipProfileId = null
+    if (gnode.ProfileId == selectedIdentityProfileId) {
+        encryptedAccessBundle = gnode.Dm[1]
+        encryptedRecipProfileId = gnode.Dm[2]
+    } else {
+        encryptedAccessBundle = gnode.Dm[0]
+    }
+    try {
+        let accessBundle = await decryptMessage(base64StringToArrayBuffer(encryptedAccessBundle))
+        if (accessBundle[0] === "{") {
+            pullDmV2(accessBundle, gnode.ProfileId, encryptedRecipProfileId)
+        } else {
+            pullDmV1(accessBundle, gnode.ProfileId, encryptedRecipProfileId)
+        }
+    } catch (e) {
+        console.log(`error processing dm: ${e.message}`)
+    }
+}
+async function pullDmV2(accessBundle, senderProfileId, encryptedRecipProfileId) {
+    if (!accessBundle) {
+        console.log("pullDmV2 saw dm that we could not decrypt the info of -- presumably not for us!")
         return
     }
+    let interacteeProfileId
+    let toInteractee = false
+    let accessBundleDecoded = JSON.parse(accessBundle)
+    let iv = base64StringToArrayBuffer(accessBundleDecoded.iv)
+    let symKeyBytes = base64StringToArrayBuffer(accessBundleDecoded.k)
+    const symKey = await window.crypto.subtle.importKey(
+        'raw',
+        symKeyBytes,
+        {
+            name: 'AES-GCM',
+            length: 256,
+        },
+        true,
+        ['encrypt', 'decrypt'],
+    )
+
+    let td = new TextDecoder()
+    if (senderProfileId == selectedIdentityProfileId) {
+        console.log("try to pull out dm v2 we sent")
+        let interacteeProfileIdBytes = await decryptPayload(base64StringToArrayBuffer(encryptedRecipProfileId), iv, symKey)
+        interacteeProfileId = td.decode(interacteeProfileIdBytes)
+        toInteractee = true
+    } else {
+        console.log("try to pull out dm v2 we received")
+        interacteeProfileId = senderProfileId
+    }
+
+    let decryptedPost
+    // the post here is encrypted using the aes symmetrical key from the access bundle.
+    try {
+        let encryptedPostJsonBytes = await getCidContentsByGet(accessBundleDecoded.cid, true)
+        let decryptedPostJsonBytes = await decryptPayload(encryptedPostJsonBytes, iv, symKey)
+        let decryptedPostJson = td.decode(decryptedPostJsonBytes)
+        decryptedPost = JSON.parse(decryptedPostJson)
+        decryptedPost.jsDate = new Date(decryptedPost.Date)
+
+        let encryptedPostContentBytes = await getCidContentsByGet(decryptedPost.Cid, true)
+        let decryptedPostPreviewTextBytes = await decryptPayload(encryptedPostContentBytes, iv, symKey)
+        decryptedPost.PreviewText = td.decode(decryptedPostPreviewTextBytes)
+    } catch(e) {
+        decryptedPost.jsDate = new Date()
+        decryptedPost.PreviewText = `[ msg load error: ${e.message} ]`
+        console.log("pullDmV2 somehow we could get the dmPostCid but we couldnt decrypt to json the blob we found there ... *shrug*.")
+        return
+    }
+    if (toInteractee) {
+        decryptedPost.To = true
+    } else {
+        decryptedPost.From = true
+    }
+    insertDmIntoOrderedArray(interacteeProfileId, decryptedPost)
+}
+
+async function pullDmV1(dmPostCid, senderProfileId, encryptedRecipProfileId) {
+    if (!dmPostCid) {
+        console.log("pullDmV1 saw dm that we could not decrypt the info of -- presumably not for us!")
+        return
+    }
+
+    let interacteeProfileId
+    let toInteractee = false
+
+    if (senderProfileId == selectedIdentityProfileId) {
+        console.log("try to pull out dm v1 we sent")
+        interacteeProfileId = await decryptMessage(base64StringToArrayBuffer(encryptedRecipProfileId))
+        toInteractee = true
+    } else {
+        console.log("try to pull out dm v1 we received")
+        interacteeProfileId = senderProfileId
+    }
+
+    // dmPostCid = await decryptMessage( base64StringToArrayBuffer(encryptedDmPostCid) )
 
     let decryptedPost
     try {
@@ -52,7 +132,10 @@ async function pullDmOut(gnode) {
     } else {
         decryptedPost.From = true
     }
+    insertDmIntoOrderedArray(interacteeProfileId, decryptedPost)
+}
 
+function insertDmIntoOrderedArray(interacteeProfileId, decryptedPost) {
     if (!orderedDmPostsByInteracteeProfileId[interacteeProfileId]) {
         orderedDmPostsByInteracteeProfileId[interacteeProfileId] = []
     }
@@ -60,6 +143,7 @@ async function pullDmOut(gnode) {
         return a.jsDate > b.jsDate ? -1 : 1
     }
     xbinaryInsert(orderedDmPostsByInteracteeProfileId[interacteeProfileId], decryptedPost, dateCompare, function(){})
+
 }
 
 function addGnToTimeline(gnode) {

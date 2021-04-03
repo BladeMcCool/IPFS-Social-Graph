@@ -260,3 +260,41 @@ async function importPrivkeyFromB64ForDecrypt(privkeyb64) {
     // );
     return privkey
 }
+
+function generateSymKey() {
+    return window.crypto.subtle.generateKey(
+        {
+            name: 'AES-GCM',
+            length: 256,
+        },
+        true,
+        ['encrypt', 'decrypt'],
+    )
+}
+
+async function encryptPayload(encodedMsg, symKey, iv) {
+    // s.b. able to use any byte array for encodedMsg including that of arbitrary blob data
+    return await window.crypto.subtle.encrypt(
+        {
+            name: 'AES-GCM',
+            iv,
+        },
+        symKey,
+        encodedMsg,
+    )
+}
+
+async function decryptPayload(payloadBytes, iv, symKey) {
+    // we base64 encoded the payload for transport
+    const decrypted = await window.crypto.subtle.decrypt(
+        {
+            name: 'AES-GCM',
+            iv: iv,
+        },
+        symKey,
+        payloadBytes,
+    )
+    return decrypted
+    // const decryptedPlainText = new TextDecoder().decode(decrypted)
+    // return decryptedPlainText
+}

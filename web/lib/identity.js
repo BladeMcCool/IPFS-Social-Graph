@@ -14,7 +14,7 @@ async function setIdentity(keyname) {
     setSelectedIdentityProfileId()
     let selectBox = document.getElementById("chooseident")
     if (selectBox.value != keyname) {
-        for (k = 0; k < selectBox.options.length; k++) {
+        for (let k = 0; k < selectBox.options.length; k++) {
             option = selectBox.options[k]
             if (option.value == keyname) {
                 selectBox.selectedIndex = option.index

@@ -70,17 +70,20 @@ async function unsignedGraphNodeForPost(pubkeyb64, text, previous, dmfor, inrepl
         graphNode.post = firstPost
     }
     if (text && dmfor) {
-        let encryptedCidToDmPostForRecip = await getEncryptedDmPostCidToProfileIdForCleartext(dmfor, text, ts)
-        let encryptedCidToDmPostForSelf  = await getEncryptedDmPostCidToProfileIdForCleartext(selectedIdentityProfileId, text, ts)
-        let encryptedRecipProfileId = await encryptMessage(selectedIdentityProfileId, dmfor)
-        // recip can see who sent it [0]
-        // we can get a copy out for ourselves [1]
-        // and when we see we sent this we will be able to figure out who we sent it to [2]
-        graphNode.Dm = [
-            arrayBufferToBase64String(encryptedCidToDmPostForRecip),
-            arrayBufferToBase64String(encryptedCidToDmPostForSelf),
-            arrayBufferToBase64String(encryptedRecipProfileId),
-        ]
+        // let encryptedCidToDmPostForRecip = await getEncryptedDmPostCidToProfileIdForCleartext(dmfor, text, ts)
+        // let encryptedCidToDmPostForSelf  = await getEncryptedDmPostCidToProfileIdForCleartext(selectedIdentityProfileId, text, ts)
+        // let encryptedRecipProfileId = await encryptMessage(selectedIdentityProfileId, dmfor)
+        // // recip can see who sent it [0]
+        // // we can get a copy out for ourselves [1]
+        // // and when we see we sent this we will be able to figure out who we sent it to [2]
+        // graphNode.Dm = [
+        //     arrayBufferToBase64String(encryptedCidToDmPostForRecip),
+        //     arrayBufferToBase64String(encryptedCidToDmPostForSelf),
+        //     arrayBufferToBase64String(encryptedRecipProfileId),
+        // ]
+        console.log("doing dm ...")
+        graphNode.Dm = await createDm(dmfor, text, ts)
+        console.log("doing dm ... done")
     }
 
     if (followprofileid) {
@@ -103,6 +106,60 @@ async function unsignedGraphNodeForPost(pubkeyb64, text, previous, dmfor, inrepl
     console.log("unsignedGraphNodeForPost graphnode state", graphNode)
     console.log("unsignedGraphNodeForPost graphnode serialized presign", serializedUnsignedGraphNode)
     return serializedUnsignedGraphNode
+}
+
+async function createDm(dmfor, text, ts) {
+    // inspired/ripped/hacked from https://gitlab.com/tomsaleeba/fiddles/-/blob/master/snippets/subtle-crypto-hybrid-demo.js
+    // we must use a hybrid encryption approach because we cannot encrypt arbitrary length messages with RSA.
+    // So we will encrypt a AES symmetric key for the recip and our own records using RSA, and then encrypt the actual payload with AES.
+    let symmetricKey = await generateSymKey()
+    let te = new TextEncoder()
+    const encodedMsg = te.encode(text)
+    const iv = window.crypto.getRandomValues(new Uint8Array(12))
+    let payloadCipherBytes = await encryptPayload(
+        encodedMsg,
+        symmetricKey,
+        iv,
+    )
+
+    let dmCyphertextCid = await addContentsToIPFS(payloadCipherBytes)
+    let dmPost = {
+        MimeType: "text/plain",
+        Cid:      dmCyphertextCid,
+        Date:     ts,
+    }
+    let dmPostJsonBytes = te.encode(JSON.stringify(dmPost))
+    const dmPostCipherBytes = await encryptPayload(
+        dmPostJsonBytes,
+        symmetricKey,
+        iv
+    )
+    let dmPostCid = await addContentsToIPFS(dmPostCipherBytes)
+
+    let exportedSymKey = await window.crypto.subtle.exportKey('raw', symmetricKey)
+    let rsaCryptPayload = JSON.stringify({
+        "k":arrayBufferToBase64String(exportedSymKey),
+        "iv":arrayBufferToBase64String(iv),
+        "cid":dmPostCid
+    })
+    if (rsaCryptPayload.length > 190) {
+        throw new Error("rsa payload too large!!!") //this shouldnt happen.
+    }
+    let encryptedDmPostAccessBundleForRecip = await encryptMessage(dmfor, rsaCryptPayload)
+    let encryptedDmPostAccessBundleForSelf = await encryptMessage(selectedIdentityProfileId, rsaCryptPayload)
+    let encryptedRecipProfileId = await encryptPayload(
+        te.encode(dmfor),
+        symmetricKey,
+        iv
+    )
+
+    let dmArray = [
+        arrayBufferToBase64String(encryptedDmPostAccessBundleForRecip),
+        arrayBufferToBase64String(encryptedDmPostAccessBundleForSelf),
+        arrayBufferToBase64String(encryptedRecipProfileId),
+    ]
+    return dmArray
+
 }
 
 async function getEncryptedDmPostCidToProfileIdForCleartext(profileId, clearText, ts) {
